@@ -16,7 +16,7 @@ switch ($action) {
             $email = $data['email'];
             $password = $data['password'];
             $password_hash = password_hash($password, PASSWORD_BCRYPT);
-            $role = $data['role'] ?? 'userId';
+            $role = $data['role'] ?? 'user_id';
 
             if($userModel->createUser($first_name, $last_name, $email, $password_hash, $role)) {
                 echo json_encode(['message' => 'User registered successfully']);
@@ -32,13 +32,13 @@ switch ($action) {
         $user = $userModel->getUserByEmail($email); 
         if($user && password_verify($password, $user['password'])) {
             session_start();
-            $SESSION['userId'] = $user['userId'];
+            $SESSION['user_id'] = $user['user_id'];
             $SESSION['role'] = $user['role'];
 
             echo json_encode([
             'message' => 'Login successful', 
             'user' => [
-                'userid' => $user['userId'],
+                'user_id' => $user['user_id'],
                 'email' => $user['email'],
                 'role' => $user['role']]
             ]);

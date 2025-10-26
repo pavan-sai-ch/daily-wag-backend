@@ -26,7 +26,7 @@ switch ($action) {
     case 'getByUser':
         $data = json_decode(file_get_contents('php://input'), true);
         $user_id = $data['user_id']??null;
-        $pets = $petModel->getPetsByUser($userId);
+        $pets = $petModel->getPetsByUser($user_id);
         echo json_decode($pets);
         break;
     

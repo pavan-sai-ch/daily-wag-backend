@@ -10,8 +10,8 @@ class PetModels {
         $stmt = $this->pdo->prepare($sql);
         return $stmt->execute();
     }
-    public function getPetsByUser($userid) {
-        $sql = "SELECT * FROM pets WHERE userId = ?";
+    public function getPetsByUser($user_id) {
+        $sql = "SELECT * FROM pets WHERE user_id = ?";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$user_id]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);

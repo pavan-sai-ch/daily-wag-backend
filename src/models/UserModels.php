@@ -15,8 +15,8 @@ class UserModels {
         $stmt->execute();
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }  
-    public function getUserById($userid){
-        $sql = "SELECT* FROM users where userid = userid";
+    public function getUserById($user_id){
+        $sql = "SELECT* FROM users where user_id = user_id";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute();
         return $stmt->fetch(PDO::FETCH_ASSOC);  
