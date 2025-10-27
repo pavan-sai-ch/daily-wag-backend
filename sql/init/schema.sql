@@ -3,9 +3,9 @@ CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
-    email VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'user', 'guest') DEFAULT 'user',
+    role ENUM('admin', 'user') DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -15,7 +15,7 @@ CREATE TABLE doctors (
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50),
     specialty VARCHAR(100) NOT NULL,
-    email VARCHAR(50) NOT NULL,
+    email VARCHAR(50) NOT NULL UNIQUE,
     phone VARCHAR(20)
 );
 
@@ -83,8 +83,8 @@ CREATE TABLE adoption (
     pet_id INT NOT NULL,
     adopter_id INT NOT NULL,
     adoption_date DATETIME NOT NULL,
-    status VARCHAR(20),
-    FOREIGN KEY (pet_id) REFERENCES pets(pet_id),
+    status ENUM('not adopted', 'adopted') default('not adopted'),
+    FOREIGN KEY (pet_id) REFERENCES pets(pet_id) ON DELETE CASCADE,
     FOREIGN KEY (adopter_id) REFERENCES users(user_id)
 );
 
@@ -107,7 +107,7 @@ CREATE TABLE payments (
     amount DECIMAL(10,2),
     payment_date DATETIME,
     payment_method VARCHAR(50),
-    status VARCHAR(50),
+    status ENUM('pending', 'complete', 'failed') DEFAULT('pending'),
     FOREIGN KEY (user_id) REFERENCES users(user_id),
     FOREIGN KEY (order_id) REFERENCES orders(order_id)
 );
@@ -119,6 +119,6 @@ CREATE TABLE membership (
     plan_details VARCHAR(100),
     start_date DATE,
     end_date DATE,
-    status VARCHAR(20),
+    status ENUM('not active', 'active', 'expired') DEFAULT('not active'),
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );

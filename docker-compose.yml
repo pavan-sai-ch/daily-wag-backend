@@ -20,7 +20,7 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ./src/init:/docker-entrypoint-initdb.d
+      - ./sql/init:/docker-entrypoint-initdb.d
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     container_name: dailywag_phpmyadmin
