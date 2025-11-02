@@ -4,7 +4,7 @@ CREATE TABLE users (
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL,
     role ENUM('admin', 'user') DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -94,7 +94,12 @@ CREATE TABLE orders (
     user_id INT NOT NULL,
     item_id INT NOT NULL,
     quantity INT DEFAULT 1,
+    total_price DECIMAL(10,2) NOT NULL,
     order_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    payment_method ENUM('cash', 'card') NOT NULL,
+    delivery_type ENUM('pickup', 'delivery') NOT NULL DEFAULT 'pickup',
+    tracking_number VARCHAR(50),
+    status ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending',
     FOREIGN KEY (user_id) REFERENCES users(user_id),
     FOREIGN KEY (item_id) REFERENCES store(item_id)
 );
@@ -102,14 +107,15 @@ CREATE TABLE orders (
 -- Payments
 CREATE TABLE payments (
     payment_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    order_id INT,
-    amount DECIMAL(10,2),
-    payment_date DATETIME,
-    payment_method VARCHAR(50),
-    status ENUM('pending', 'complete', 'failed') DEFAULT('pending'),
-    FOREIGN KEY (user_id) REFERENCES users(user_id),
-    FOREIGN KEY (order_id) REFERENCES orders(order_id)
+    order_id INT NOT NULL,
+    user_id INT NOT NULL, 
+    amount DECIMAL(10,2) NOT NULL,
+    payment_method ENUM('cash', 'card') NOT NULL,
+    payment_status ENUM('pending', 'complete', 'failed', 'refunded') DEFAULT 'pending',
+    transaction_id VARCHAR(100) UNIQUE,
+    transaction_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
 -- Membership

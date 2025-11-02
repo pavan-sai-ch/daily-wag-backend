@@ -1,57 +1,65 @@
 <?php 
-require_once '../app/config/pdo.php'; 
-require_once '../app/models/UserModels.php';  
+require_once __DIR__ . '/../app/config/pdo.php';  
+require_once __DIR__ . '/../src/models/UserModels.php';
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, GET, OPTIONS, DELETE, PUT');
-header('Access-Control-Allow-Headers: Content-Type');
+session_start();
 
-$userModel = new UserModels($pdo);
-$action = $_GET['action'] ?? '';
-switch ($action) {
-    case 'register':
-            $data = json_decode(file_get_contents('php://input'), true);
-            $first_name = $data['first_name'];
-            $last_name = $data['last_name'];
-            $email = $data['email'];
-            $password = $data['password'];
-            $password_hash = password_hash($password, PASSWORD_BCRYPT);
-            $role = $data['role'] ?? 'user_id';
+$userModel = new UserModels($pdo); 
+$action = $_GET['action'] ?? ''; 
 
-            if($userModel->createUser($first_name, $last_name, $email, $password_hash, $role)) {
-                echo json_encode(['message' => 'User registered successfully']);
-            } else {
-                echo json_encode(['message' => 'Registration failed']);             
-            }
-        break;  
+if($action === 'register') {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $first_name = ($data['first_name']);
+    $last_name = ($data['last_name']);
+    $email = $data['email'];
+    $password = $data['password'];
+    $role = isset($data['role']) ? $data['role'] : 'user';
 
-    case 'login':
-        $data = json_decode(file_get_contents('php://input'), true);
-        $email = $data['email'];
-        $password = $data['password'];
-        $user = $userModel->getUserByEmail($email); 
-        if($user && password_verify($password, $user['password'])) {
-            session_start();
-            $SESSION['user_id'] = $user['user_id'];
-            $SESSION['role'] = $user['role'];
+    if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        echo json_encode(['error'=>'Invalid email!']);
+        exit;
+    }
+    if(empty($password) OR strlen($password) < 8) {
+    echo json_encode(['error'=>'Password must be at least 8 characters!']);
+        exit;
+    }
 
-            echo json_encode([
-            'message' => 'Login successful', 
-            'user' => [
-                'user_id' => $user['user_id'],
-                'email' => $user['email'],
-                'role' => $user['role']]
-            ]);
-        } else {
-            echo json_encode('Invalid email or password');
-        }
-        break;
+    $password_hash = password_hash($password, PASSWORD_BCRYPT);
 
-    case 'logout':
-        session_start();
-        session_destroy();
-        echo json_encode('Logout successful');
-        break;
-    default:
-        echo json_encode('Invalid action');
+    if($userModel->createUser($first_name, $last_name, $email, $password_hash, $role)) {
+        echo json_encode(['message'=>'User registered!']);
+    } else {
+        echo json_encode(['error'=> 'Registration failed!']);
+    }
+    exit;
 }
+if($action === 'login') {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $email = ($data['email']);
+    $password = ($data['password']);
+
+    $user = $userModel->getUserByEmail($email);
+    if($user && password_verify($password, $user['password'])) {
+        $_SESSION['user_id'] = $user['user_id'];
+        $_SESSION['role'] = $user['role'];
+
+        $access_count = isset($_COOKIE['access_count']) ? $_COOKIE['access_count'] + 1 : 1;
+        setcookie('access_count', $access_count, time()+3600);
+
+        echo json_encode([
+            'message'=>'Login Successful', 
+            'email'=>$user['email'], 
+            'role'=>$user['role'], 
+            'access_count'=>$access_count
+        ]);
+    } else {
+        echo json_encode(['error'=>'Invalid credentials']);
+    }
+    exit;
+}
+if ($action === 'logout') {
+    session_destroy();
+    echo json_encode(['message'=>'Logged out']);
+    exit;
+}
+echo json_encode(['error'=>'Invalid action']);
