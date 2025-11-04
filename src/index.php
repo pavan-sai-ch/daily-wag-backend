@@ -1,9 +1,9 @@
 ﻿<?php echo "Backend is working!"; ?>
 <?php
-$host = 'db';
-$db   = 'testdb';
+$host = 'dailywag_db';
+$db   = 'dailywag';
 $user = 'testuser';
-$pass = 'testpass';
+$pass = 'testpassword';
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
