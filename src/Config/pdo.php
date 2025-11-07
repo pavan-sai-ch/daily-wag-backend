@@ -1,9 +1,9 @@
 <?php
-$host_name= 'db';
-$db_name = 'dailyway_db';
-$user = 'dailyway_user';
-$pass = 'dailyway_pass';
-$charset = 'utf8mb4';
+$host_name = 'db';   
+$db_name   = 'dailywag';
+$user      = 'testuser';
+$pass      = 'testpassword';
+$charset   = 'utf8mb4';
 
 $dsn = "mysql:host=$host_name; dbname=$db_name; charset=$charset";
 

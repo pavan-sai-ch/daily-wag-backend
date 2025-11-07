@@ -48,7 +48,7 @@ if($action === 'login') {
 
         echo json_encode([
             'message'=>'Login Successful', 
-            'email'=>$user['email'], 
+            'email'=>$user['email'],
             'role'=>$user['role'], 
             'access_count'=>$access_count
         ]);

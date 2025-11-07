@@ -1,6 +1,6 @@
 ﻿<?php echo "Backend is working!"; ?>
 <?php
-$host = 'dailywag_db';
+$host = 'db';
 $db   = 'dailywag';
 $user = 'testuser';
 $pass = 'testpassword';
