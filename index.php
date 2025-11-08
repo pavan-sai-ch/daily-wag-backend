@@ -33,6 +33,7 @@
 // This is needed for authentication, flash messages, etc.
 session_start();
 
+
 // 2. Error Reporting
 // Show all errors during development. Turn this off in production.
 ini_set('display_errors', 1);
