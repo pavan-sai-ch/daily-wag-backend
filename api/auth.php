@@ -1,8 +1,8 @@
 <?php 
-require_once __DIR__ . '/../app/config/pdo.php';  
+require_once __DIR__ . '/../app/config/pdo.php';
 require_once __DIR__ . '/../src/models/UserModels.php';
 header('Content-Type: application/json');
-session_start();
+//session_start();
 
 $userModel = new UserModels($pdo); 
 $action = $_GET['action'] ?? ''; 
@@ -13,7 +13,7 @@ if($action === 'register') {
     $last_name = ($data['last_name']);
     $email = $data['email'];
     $password = $data['password'];
-    $role = isset($data['role']) ? $data['role'] : 'user';
+    $role = $data['role'] ?? 'user';
 
     if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         echo json_encode(['error'=>'Invalid email!']);
