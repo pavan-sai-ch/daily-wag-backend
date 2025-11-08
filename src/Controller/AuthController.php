@@ -87,6 +87,4 @@ class AuthController {
         return ['error' => 'Delete failed!'];
     }
 }
-
-
 }

@@ -22,5 +22,10 @@ php -S localhost:8080
 - `api/users.php` — user profile actions
 - `api/pets.php` — pet CRUD (uses `PetModels` / `PetController`)
 - `api/products.php` — store items (uses `ProductModel` / `ProductController`)
-- `api/visits.php` — appointments and visits (uses `VisitController`)
+- `api/visits.php` — appointments and visits (ses `VisitController`)
 
+- Ensure these ports are free:
+  - 8000 → PHP backend  http://localhost:8000/index.php
+  
+  - 8082 → phpMyAdmin
+  - 5173 → Frontend (Vite)
