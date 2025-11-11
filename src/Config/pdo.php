@@ -1,57 +1,92 @@
 <?php
-//$host_name= 'db';
-//$db_name = 'dailyway_db';
-//$user = 'dailyway_user';
-//$pass = 'dailyway_pass';
-//$charset = 'utf8mb4';
-//
-//$dsn = "mysql:host=$host_name; dbname=$db_name; charset=$charset";
-//
-//try{
-//    $pdo = new PDO($dsn, $user, $pass);
-//    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-//} catch (PDOException $e) {
-//    throw new PDOException($e->getMessage(), (int)$e->getCode());
-//}
-
-
 /**
- * Database Connection (PDO)
+ * Database Connection Class
  *
- * This file establishes the connection to the database using PDO
- * and returns the connection instance.
- *
- * It pulls credentials from environment variables, which is a
- * best practice for security and portability (especially with Docker).
+ * This class handles the connection to the MySQL database using PDO.
+ * It reads its configuration from the environment variables
+ * set in the docker-compose.yml file.
  */
+class Database {
 
-// 1. Get database credentials from environment variables
-// These would be set in your 'docker-compose.yml' file.
-$db_host = getenv('DB_HOST') ?: 'db'; // 'db' is often the service name in docker-compose
-$db_port = getenv('DB_PORT') ?: '3306'; // Default MySQL/MariaDB port
-$db_name = getenv('DB_NAME') ?: 'dailywag_db';
-$db_user = getenv('DB_USER') ?: 'dailywag_user';
-$db_pass = getenv('DB_PASS') ?: 'dailywag_pass';
+    // --- Connection Parameters ---
 
-// 2. Create the Data Source Name (DSN)
-$dsn = "mysql:host={$db_host};port={$db_port};dbname={$db_name};charset=utf8mb4";
+    /**
+     * @var string The hostname for the database server.
+     * 'db' is the service name defined in docker-compose.yml.
+     */
+    private $host = 'db';
 
-// 3. Set PDO options
-$options = [
-    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, // Throw exceptions on errors
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,       // Fetch as associative arrays
-    PDO::ATTR_EMULATE_PREPARES => false,                  // Use real prepared statements
-];
+    /**
+     * @var string The name of the database to connect to.
+     */
+    private $db_name;
 
-// 4. Try to create the PDO instance (the connection)
-try {
-    $pdo = new PDO($dsn, $db_user, $db_pass, $options);
-} catch (PDOException $e) {
-    // If connection fails, stop everything and show a clear error
-    // This is safer than letting the app continue in a broken state
-    throw new PDOException("Database connection failed: " . $e->getMessage(), (int)$e->getCode());
+    /**
+     * @var string The username for the database connection.
+     */
+    private $username;
+
+    /**
+     * @var string The password for the database connection.
+     */
+    private $password;
+
+    /**
+     * @var PDO|null The PDO connection object.
+     */
+    public $conn;
+
+    /**
+     * The constructor reads the environment variables when a new
+     * Database object is created.
+     */
+    public function __construct() {
+        // Read credentials from the container's environment variables
+        $this->db_name = getenv('MYSQL_DATABASE');
+        $this->username = getenv('MYSQL_USER');
+        $this->password = getenv('MYSQL_PASSWORD');
+    }
+
+    /**
+     * Establishes and returns the database connection.
+     *
+     * @return PDO|null The PDO connection object or null on failure.
+     */
+    public function getConnection() {
+
+        $this->conn = null; // Start with a null connection
+
+        // Create the DSN (Data Source Name) string
+        $dsn = "mysql:host=" . $this->host . ";dbname=" . $this->db_name . ";charset=utf8mb4";
+
+        $options = [
+            // 1. Set error mode to throw exceptions. This is critical for debugging.
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+
+            // 2. Set the default fetch mode to associative array.
+            // This means $row['first_name'] instead of $row[0].
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+
+            // 3. Turn off emulated prepared statements.
+            // This tells PDO to use real, secure prepared statements.
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ];
+
+        try {
+            // Create a new PDO (PHP Data Objects) instance
+            $this->conn = new PDO($dsn, $this->username, $this->password, $options);
+
+        } catch(PDOException $exception) {
+            // If the connection fails, output the error message
+            // In a production environment, you would log this to a file instead.
+            http_response_code(500);
+            echo json_encode([
+                "status" => "error",
+                "message" => "Database Connection Error: " . $exception->getMessage()
+            ]);
+            exit(); // Stop the script if we can't connect
+        }
+
+        return $this->conn;
+    }
 }
-
-// 5. Return the connection object
-// The 'index.php' file will 'require' this file and catch this $pdo object.
-return $pdo;

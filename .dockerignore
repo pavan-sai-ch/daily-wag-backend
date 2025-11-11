@@ -1,0 +1,29 @@
+# --- Git ---
+# Ignore the entire .git repository history
+.git/
+
+# --- Environment ---
+# Ignore the local environment file
+.env
+
+# --- Docker ---
+# Ignore the Docker Compose file itself
+docker-compose.yml
+# Ignore this file
+.dockerignore
+
+# --- Documentation ---
+README.md
+
+# --- Dependencies ---
+# Ignore the vendor folder (should be installed *inside* the container)
+vendor/
+
+# --- IDEs and OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log

@@ -1,52 +1,90 @@
-<?php 
+<?php
+/**
+ * User Model
+ * This class handles all database operations for the `users` table.
+ */
 class UserModels {
-    private $pdo;
-    public function __construct($pdo) {
-        $this->pdo = $pdo;
+
+    /**
+     * @var PDO The database connection object.
+     */
+    private $db;
+
+    /**
+     * Constructor to inject the database connection.
+     *
+     * @param PDO $db The PDO database connection.
+     */
+    public function __construct($db) {
+        $this->db = $db;
     }
-    public function createUser($first_name, $last_name, $email, $password_hash, $role = 'user') {
-        $sql = "INSERT INTO users (first_name, last_name, email, password, role) VALUES (:first_name, :last_name, :email, :password, :role)";
-        $stmt = $this->pdo->prepare($sql);
-        return $stmt->execute([
-            ':first_name' => $first_name,
-            ':last_name' => $last_name,
-            ':email' => $email,
-            ':password' => $password_hash,
-            ':role' => $role
-        ]);
+
+    /**
+     * Finds a user by their email address.
+     *
+     * @param string $email The user's email.
+     * @return mixed The user record as an array, or false if not found.
+     */
+    public function findByEmail($email) {
+        try {
+            $sql = "SELECT * FROM users WHERE email = :email LIMIT 1";
+            $stmt = $this->db->prepare($sql);
+            $stmt->bindParam(':email', $email);
+            $stmt->execute();
+
+            // fetch() returns the row or false if no row is found
+            return $stmt->fetch();
+        } catch (PDOException $e) {
+            // Log error
+            return false;
+        }
     }
-    public function getUserByEmail($email) {
-        $sql = "SELECT * FROM users WHERE email = :email";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':email' => $email]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-    public function getUserById($user_id) {
-        $sql = "SELECT * FROM users WHERE user_id = :user_id";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':user_id' => $user_id]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-    public function getAllUsers() {
-        $sql = 'SELECT * FROM users';
-        $stmt = $this->pdo->query($sql);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-    public function updateUser($user_id, $first_name, $last_name, $email, $role) {
-        $sql = "UPDATE users SET first_name = :first_name, last_name = :last_name, email = :email, role = :role WHERE user_id = :user_id";
-        $stmt = $this->pdo->prepare($sql);
-        return $stmt->execute([
-            ':first_name' => $first_name,
-            ':last_name' => $last_name,
-            ':email' => $email,
-            ':role' => $role,
-            ':user_id' => $user_id
-        ]);
-    }
-    public function deleteUser($user_id) {
-        $sql = "DELETE FROM users WHERE user_id = :user_id";
-        $stmt = $this->pdo->prepare($sql);
-        return $stmt->execute([':user_id' => $user_id]);
+
+    /**
+     * Creates a new user in the database.
+     *
+     * @param array $data Associative array of user data
+     * @return bool True on success, false on failure.
+     */
+    public function create($data) {
+        // Get data from the array
+        $firstName = $data['firstName'];
+        $lastName = $data['lastName'];
+        $email = $data['email'];
+        $password = $data['password'];
+
+        // --- CRITICAL: Hash the password ---
+        // We use BCRYPT, the industry standard.
+        $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+
+        // The SQL query with named placeholders
+        $sql = "INSERT INTO users (first_name, last_name, email, password, role) 
+                VALUES (:firstName, :lastName, :email, :password, :role)";
+
+        try {
+            // Prepare the statement
+            $stmt = $this->db->prepare($sql);
+
+            // Bind the values to the placeholders
+            $stmt->bindParam(':firstName', $firstName);
+            $stmt->bindParam(':lastName', $lastName);
+            $stmt->bindParam(':email', $email);
+            $stmt->bindParam(':password', $hashedPassword);
+
+            // New users default to 'user' role
+            $defaultRole = 'user';
+            $stmt->bindParam(':role', $defaultRole);
+
+            // Execute the statement
+            $stmt->execute();
+
+            // Return true if the row was successfully inserted
+            return $stmt->rowCount() > 0;
+
+        } catch (PDOException $e) {
+            // This will catch errors, like if the email is already in use (UNIQUE constraint)
+            // In a real app, you would check $e->getCode() to see the specific error.
+            return false;
+        }
     }
 }
-?>

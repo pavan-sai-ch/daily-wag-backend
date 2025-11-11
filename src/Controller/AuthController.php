@@ -1,90 +1,77 @@
 <?php
-class AuthController {
-    protected $userModel;
+/**
+ * Auth Controller
+ * This class handles user registration and login.
+ * It extends BaseController to use its response methods.
+ */
+class AuthController extends BaseController {
 
-    public function __construct($pdo) {
-        require_once __DIR__ . '/../models/UserModels.php';
-        $this->userModel = new UserModels($pdo);
+    /**
+     * @var UserModels The user model instance.
+     */
+    private $userModel;
+
+    /**
+     * Constructor to inject the DB connection and instantiate the model.
+     *
+     * @param PDO $db The database connection.
+     */
+    public function __construct($db) {
+        // Create a new instance of the UserModels, passing it the DB connection
+        $this->userModel = new UserModels($db);
     }
 
-    public function register($data) {
-        $first_name = ($data['first_name'] ?? '');
-        $last_name  = ($data['last_name'] ?? '');
-        $email      = ($data['email'] ?? '');
-        $password   = $data['password'] ?? '';
-        $role       = ($data['role'] ?? 'user');
+    /**
+     * Handles the POST /api/auth/register request.
+     */
+    public function register() {
+        // 1. Get the JSON data from the request
+        $data = $this->getRequestData();
 
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return ['error' => 'Invalid email!'];
+        // 2. Validate the data
+        if (empty($data['firstName']) || empty($data['lastName']) || empty($data['email']) || empty($data['password'])) {
+            $this->sendError('All fields (firstName, lastName, email, password) are required.', 400);
+            return;
         }
 
-        if (empty($password) || strlen($password) < 8) {
-            return ['error' => 'Password must be at least 8 characters'];
+        // (Your frontend validation is more complex, but this is a good server-side check)
+        if (strlen($data['password']) < 8) {
+            $this->sendError('Password must be at least 8 characters long.', 400);
+            return;
         }
 
-        $password_hash = password_hash($password, PASSWORD_BCRYPT);
+        try {
+            // 3. Check if user already exists
+            $existingUser = $this->userModel->findByEmail($data['email']);
+            if ($existingUser) {
+                // 409 Conflict is the correct status code for a duplicate
+                $this->sendError('An account with this email already exists.', 409);
+                return;
+            }
 
-        if ($this->userModel->createUser($first_name, $last_name, $email, $password_hash, $role)) {
-            return ['message' => 'User registered!'];
-        } else {
-            return ['error' => 'Registration failed!'];
+            // 4. Try to create the user
+            $success = $this->userModel->create($data);
+
+            if ($success) {
+                // 5. Send success response
+                // 201 Created is the correct status code for a successful POST
+                $this->sendResponse(['status' => 'success', 'message' => 'User registered successfully.'], 201);
+            } else {
+                $this->sendError('Failed to register user. Please try again.', 500);
+            }
+        } catch (Exception $e) {
+            // Catch any other unexpected errors
+            $this->sendError('An internal server error occurred: ' . $e->getMessage(), 500);
         }
     }
 
-    public function login($data) {
-        $email    = ($data['email'] ?? '');
-        $password = $data['password'] ?? '';
-
-        $user = $this->userModel->getUserByEmail($email);
-        if ($user && password_verify($password, $user['password'])) {
-            if (session_status() !== PHP_SESSION_ACTIVE) session_start();
-            $_SESSION['user_id'] = $user['user_id'];
-            $_SESSION['role']    = $user['role'];
-
-            $access_count = isset($_COOKIE['access_count']) ? (int)$_COOKIE['access_count'] + 1 : 1;
-            setcookie('access_count', $access_count, time() + 3600, '/');
-
-            return [
-                'message'      => 'Login Successful',
-                'email'        => $user['email'],
-                'role'         => $user['role'],
-                'access_count' => $access_count
-            ];
-        }
-
-        return ['error' => 'Invalid credentials'];
+    // You will add your login() function here later
+    public function login() {
+        // 1. Get request data (email, password)
+        // 2. Find user by email in the model
+        // 3. If user exists, use password_verify() to check the hash
+        // 4. If password is correct, create a session/cookie
+        // 5. Send success response
+        $this->sendResponse(['status' => 'success', 'message' => 'Login endpoint is not yet implemented.']);
     }
-
-    public function logout() {
-        if (session_status() !== PHP_SESSION_ACTIVE) session_start();
-        session_destroy();
-        setcookie('access_count', '', time() - 3600, '/');
-        return ['message' => 'Logged out'];
-    }
-    
-    public function listUsers() {
-        return $this->userModel->getAllUsers();
-    }
-
-    public function updateUser($data) {
-    $user_id    = $data['user_id'] ?? '';
-    $first_name = $data['first_name'] ?? '';
-    $last_name  = $data['last_name'] ?? '';
-    $email      = $data['email'] ?? '';
-    $role       = $data['role'] ?? 'user';
-
-    if ($this->userModel->updateUser($user_id, $first_name, $last_name, $email, $role)) {
-        return ['message' => 'User updated!'];
-    } else {
-        return ['error' => 'Update failed!'];
-    }}
-    
-    public function deleteUser($data) {
-    $user_id = $data['user_id'] ?? '';
-    if ($this->userModel->deleteUser($user_id)) {
-        return ['message' => 'User deleted!'];
-    } else {
-        return ['error' => 'Delete failed!'];
-    }
-}
 }
