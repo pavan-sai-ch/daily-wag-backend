@@ -67,11 +67,54 @@ class AuthController extends BaseController {
 
     // You will add your login() function here later
     public function login() {
-        // 1. Get request data (email, password)
-        // 2. Find user by email in the model
-        // 3. If user exists, use password_verify() to check the hash
-        // 4. If password is correct, create a session/cookie
-        // 5. Send success response
-        $this->sendResponse(['status' => 'success', 'message' => 'Login endpoint is not yet implemented.']);
+        // 1. Get and sanitize the input data
+        $data = $this->getRequestData();
+        $data = Sanitize::all($data);
+
+        // 2. Validate input
+        if (empty($data['email']) || empty($data['password'])) {
+            $this->sendError('Email and password are required.', 400);
+            return;
+        }
+
+        try {
+            // 3. Find the user by their email
+            $user = $this->userModel->findByEmail($data['email']);
+
+            // 4. Verify the user and password
+            // A. Check if user exists
+            // B. Use password_verify() to check the hash
+            if (!$user || !password_verify($data['password'], $user['password'])) {
+                // Use a generic error message to prevent "user enumeration" attacks
+                $this->sendError('Invalid email or password.', 401);
+                return;
+            }
+
+            // 5. --- SESSION HANDLING ---
+            // Password is correct! Regenerate session ID to prevent fixation
+            session_regenerate_id(true);
+
+            // Store user data in the session
+            // We do NOT store the password hash.
+            $_SESSION['user_id'] = $user['user_id'];
+            $_SESSION['user_role'] = $user['role'];
+            $_SESSION['user_first_name'] = $user['first_name'];
+
+            // 6. Send the user data back to the React app
+            // The React app will use this to update its Redux store.
+            $this->sendResponse([
+                'status' => 'success',
+                'user' => [
+                    'id' => $user['user_id'],
+                    'firstName' => $user['first_name'],
+                    'lastName' => $user['last_name'],
+                    'email' => $user['email'],
+                    'role' => $user['role']
+                ]
+            ], 200);
+
+        } catch (Exception $e) {
+            $this->sendError('An internal server error occurred: ' . $e.getMessage(), 500);
+        }
     }
 }

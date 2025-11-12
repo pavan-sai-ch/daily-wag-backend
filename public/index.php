@@ -1,4 +1,7 @@
 <?php
+// We must start the session *before* any other output or headers.
+require_once __DIR__ . '/../src/helpers/sessions/SessionManager.php';
+SessionManager::start(); // Start the secure session
 // --- 1. Global Headers & CORS ---
 
 // Read the allowed origin from the environment variable
@@ -27,8 +30,8 @@ require_once __DIR__ . '/../src/Utils/Sanitize.php';
 // --- 3. Load All Your Controllers & Models ---
 require_once __DIR__ . '/../src/Controller/AuthController.php';
 require_once __DIR__ . '/../src/models/UserModels.php';
-// require_once __DIR__ . '/../src/Controller/PetController.php';
-// require_once __DIR__ . '/../src/models/PetModels.php';
+require_once __DIR__ . '/../src/Controller/PetController.php';
+require_once __DIR__ . '/../src/models/PetModels.php';
 
 // --- 4. Get Request Info ---
 $requestMethod = $_SERVER["REQUEST_METHOD"];
@@ -52,7 +55,25 @@ $router->add('GET', '/api/test', function() {
 
 // Auth Routes
 $router->add('POST', '/api/auth/register', [new AuthController($dbConnection), 'register']);
-// $router->add('POST', '/api/auth/login', [new AuthController($dbConnection), 'login']);
+$router->add('POST', '/api/auth/login', [new AuthController($dbConnection), 'login']);
+
+//pet routes
+// Note: We create ONE controller instance and reuse it
+$petController = new PetController($dbConnection);
+
+// GET /api/pets - Get all pets for the logged-in user
+$router->add('GET', '/api/pets', [$petController, 'getUserPets']);
+
+// POST /api/pets - Add a new pet
+$router->add('POST', '/api/pets', [$petController, 'addPet']);
+
+// PUT /api/pets/:id - Update a specific pet
+// :id will be converted to a regex and passed as a parameter
+$router->add('PUT', '/api/pets/:id', [$petController, 'updatePet']);
+
+// DELETE /api/pets/:id - Delete a specific pet
+$router->add('DELETE', '/api/pets/:id', [$petController, 'deletePet']);
+// --- END NEW ROUTES ---
 
 // --- 7. Dispatch the Router ---
 $router->dispatch($requestMethod, $requestUri);

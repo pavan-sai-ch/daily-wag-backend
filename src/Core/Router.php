@@ -1,22 +1,15 @@
 <?php
 /**
- * A basic router class.
+ * A regex-based router class.
  *
  * This class stores API routes and dispatches requests
- * to the correct controller action or callback function.
+ * to the correct controller action, supporting dynamic parameters.
  */
 class Router {
-    /**
-     * @var array Stores all the registered routes.
-     */
     protected $routes = [];
 
     /**
      * Adds a new route to the router.
-     *
-     * @param string $method The HTTP method (e.g., 'GET', 'POST').
-     * @param string $uri The URL path (e.g., '/api/auth/register').
-     * @param callable|array $action The function to execute or [Controller, 'method'].
      */
     public function add($method, $uri, $action) {
         $this->routes[] = [
@@ -36,40 +29,49 @@ class Router {
         // Loop through all registered routes
         foreach ($this->routes as $route) {
 
-            // Check if both the method and URI match
-            if ($route['method'] === $requestMethod && $route['uri'] === $requestUri) {
+            // 1. Convert the route URI (e.g., /api/pets/:id) into a regex
+            // This replaces ":id" with a capture group "([a-zA-Z0-9_]+)"
+            $pattern = preg_replace_callback('/:([a-zA-Z_]+)/', function($matches) {
+                return '([a-zA-Z0-9_]+)';
+            }, $route['uri']);
+
+            // Add regex delimiters and make it a full match
+            $pattern = '#^' . $pattern . '$#';
+
+            $matches = [];
+            // 2. Check if the method matches AND the regex pattern matches the request URI
+            if ($route['method'] === $requestMethod && preg_match($pattern, $requestUri, $matches)) {
+
+                // 3. Remove the full match (index 0) to get only the parameters
+                array_shift($matches);
+                $params = $matches;
 
                 $action = $route['action'];
 
-                // If the action is a callable function (like our /api/test route)
+                // If the action is a callable function
                 if (is_callable($action)) {
-                    // Execute the function
-                    call_user_func($action);
-                    return; // Stop processing
+                    call_user_func_array($action, $params);
+                    return;
                 }
 
                 // If the action is an array [Controller, 'method']
                 if (is_array($action) && count($action) === 2) {
-                    $controller = $action[0]; // The controller object (e.g., new AuthController(...))
-                    $method = $action[1];     // The method name (e.g., 'register')
+                    $controller = $action[0];
+                    $method = $action[1];
 
-                    // Check if the method exists in the controller
                     if (method_exists($controller, $method)) {
-                        // Execute the controller method
-                        $controller->$method();
-                        return; // Stop processing
+                        // 4. Call the controller method and pass the URL parameters
+                        call_user_func_array([$controller, $method], $params);
+                        return;
                     }
                 }
             }
         }
 
-        // If no route was matched after the loop
+        // If no route was matched
         $this->sendNotFoundResponse();
     }
 
-    /**
-     * Sends a 404 Not Found response.
-     */
     private function sendNotFoundResponse() {
         http_response_code(404);
         echo json_encode([
