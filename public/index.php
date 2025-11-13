@@ -32,7 +32,11 @@ require_once __DIR__ . '/../src/Controller/AuthController.php';
 require_once __DIR__ . '/../src/models/UserModels.php';
 require_once __DIR__ . '/../src/Controller/PetController.php';
 require_once __DIR__ . '/../src/models/PetModels.php';
-
+require_once __DIR__ . '/../src/Controller/BookingController.php';
+require_once __DIR__ . '/../src/models/BookingModels.php';
+require_once __DIR__ . '/../src/Controller/StoreController.php';
+require_once __DIR__ . '/../src/models/StoreModels.php';
+require_once __DIR__ . '/../src/Controller/CartController.php';
 // --- 4. Get Request Info ---
 $requestMethod = $_SERVER["REQUEST_METHOD"];
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -73,7 +77,41 @@ $router->add('PUT', '/api/pets/:id', [$petController, 'updatePet']);
 
 // DELETE /api/pets/:id - Delete a specific pet
 $router->add('DELETE', '/api/pets/:id', [$petController, 'deletePet']);
-// --- END NEW ROUTES ---
+
+$bookingController = new BookingController($dbConnection);
+
+// Customer Routes
+$router->add('POST', '/api/bookings/grooming', [$bookingController, 'addGroomingBooking']);
+$router->add('POST', '/api/bookings/medical', [$bookingController, 'addMedicalBooking']);
+$router->add('GET', '/api/bookings/user', [$bookingController, 'getUserBookings']);
+
+// Doctor Route
+$router->add('GET', '/api/bookings/doctor', [$bookingController, 'getDoctorBookings']);
+
+// Admin Routes
+$router->add('GET', '/api/bookings/all', [$bookingController, 'getAllBookings']);
+$router->add('PUT', '/api/bookings/:id/status', [$bookingController, 'updateBookingStatus']);
+
+$storeController = new StoreController($dbConnection);
+// GET /api/products - Get all products
+$router->add('GET', '/api/products', [$storeController, 'getAllProducts']);
+// GET /api/products/:id - Get a single product
+$router->add('GET', '/api/products/:id', [$storeController, 'getProductById']);
+
+//cart routes
+$cartController = new CartController($dbConnection);
+
+// GET /api/cart - Get the user's current cart
+$router->add('GET', '/api/cart', [$cartController, 'getCart']);
+
+// POST /api/cart - Add an item to the cart
+$router->add('POST', '/api/cart', [$cartController, 'addItemToCart']);
+
+// PUT /api/cart/:id - Update an item's quantity in the cart
+$router->add('PUT', '/api/cart/:id', [$cartController, 'updateCartItem']);
+
+// DELETE /api/cart/:id - Remove an item from the cart
+$router->add('DELETE', '/api/cart/:id', [$cartController, 'removeCartItem']);
 
 // --- 7. Dispatch the Router ---
 $router->dispatch($requestMethod, $requestUri);
