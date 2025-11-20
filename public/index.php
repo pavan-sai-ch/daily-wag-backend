@@ -37,6 +37,10 @@ require_once __DIR__ . '/../src/models/BookingModels.php';
 require_once __DIR__ . '/../src/Controller/StoreController.php';
 require_once __DIR__ . '/../src/models/StoreModels.php';
 require_once __DIR__ . '/../src/Controller/CartController.php';
+require_once __DIR__ . '/../src/Controller/CheckoutController.php';
+require_once __DIR__ . '/../src/models/OrderModels.php';
+require_once __DIR__ . '/../src/Controller/AdoptionController.php';
+require_once __DIR__ . '/../src/models/AdoptionModels.php';
 // --- 4. Get Request Info ---
 $requestMethod = $_SERVER["REQUEST_METHOD"];
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -112,6 +116,24 @@ $router->add('PUT', '/api/cart/:id', [$cartController, 'updateCartItem']);
 
 // DELETE /api/cart/:id - Remove an item from the cart
 $router->add('DELETE', '/api/cart/:id', [$cartController, 'removeCartItem']);
+
+$checkoutController = new CheckoutController($dbConnection);
+$router->add('POST', '/api/checkout', [$checkoutController, 'processCheckout']);
+
+// --- ADD NEW ADOPTION ROUTES ---
+$adoptionController = new AdoptionController($dbConnection);
+
+// Public: View available pets
+$router->add('GET', '/api/adoption/available', [$adoptionController, 'getAvailablePets']);
+
+// User: Request adoption
+$router->add('POST', '/api/adoption/request', [$adoptionController, 'requestAdoption']);
+
+// Admin: View pending requests
+$router->add('GET', '/api/adoption/pending', [$adoptionController, 'getPendingRequests']);
+
+// Admin: Approve/Deny request
+$router->add('PUT', '/api/adoption/:id/status', [$adoptionController, 'updateRequestStatus']);
 
 // --- 7. Dispatch the Router ---
 $router->dispatch($requestMethod, $requestUri);

@@ -5,18 +5,29 @@
  */
 class UserModels {
 
-    /**
-     * @var PDO The database connection object.
-     */
     private $db;
 
-    /**
-     * Constructor to inject the database connection.
-     *
-     * @param PDO $db The PDO database connection.
-     */
     public function __construct($db) {
         $this->db = $db;
+    }
+
+    /**
+     * Finds a user by their ID.
+     * Useful for checking profile completeness before actions.
+     *
+     * @param int $userId The user's ID.
+     * @return mixed The user record as an array, or false if not found.
+     */
+    public function findById($userId) {
+        try {
+            $sql = "SELECT * FROM users WHERE user_id = :userId LIMIT 1";
+            $stmt = $this->db->prepare($sql);
+            $stmt->bindParam(':userId', $userId);
+            $stmt->execute();
+            return $stmt->fetch();
+        } catch (PDOException $e) {
+            return false;
+        }
     }
 
     /**
@@ -83,7 +94,6 @@ class UserModels {
 
         } catch (PDOException $e) {
             // This will catch errors, like if the email is already in use (UNIQUE constraint)
-            // In a real app, you would check $e->getCode() to see the specific error.
             return false;
         }
     }

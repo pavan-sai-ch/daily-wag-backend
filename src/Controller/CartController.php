@@ -9,7 +9,7 @@ class CartController extends BaseController {
     // Note: We don't need a Model for basic cart management,
     // as we are just manipulating the $_SESSION array.
     // We *will* need Models (Store, Order) for the checkout process.
-
+    private $db;
     public function __construct($db) {
         // We still need the $db connection for when we add checkout logic
         $this->db = $db;
