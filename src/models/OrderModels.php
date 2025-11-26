@@ -84,4 +84,46 @@ class OrderModels {
         $stmt->execute();
         return $stmt->fetchAll();
     }
+
+    /**
+     * (Admin) Finds ALL orders with user details.
+     * @return array List of all orders.
+     */
+    public function findAll() {
+        $sql = "SELECT o.*, u.first_name, u.last_name, u.email 
+                FROM orders o
+                JOIN users u ON o.user_id = u.user_id
+                ORDER BY o.order_date DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * (Admin) Finds details (items) for a specific order.
+     * @param int $orderId
+     * @return array List of items in the order.
+     */
+    public function findOrderItems($orderId) {
+        $sql = "SELECT oi.*, s.item_name, s.photo_url 
+                FROM order_items oi
+                JOIN store s ON oi.item_id = s.item_id
+                WHERE oi.order_id = :orderId";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':orderId', $orderId);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * (Admin) Updates order status.
+     */
+    public function updateStatus($orderId, $status) {
+        $sql = "UPDATE orders SET status = :status WHERE order_id = :orderId";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':status', $status);
+        $stmt->bindParam(':orderId', $orderId);
+        $stmt->execute();
+        return $stmt->rowCount() > 0;
+    }
 }

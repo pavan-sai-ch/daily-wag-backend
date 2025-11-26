@@ -38,57 +38,100 @@ class PetModels {
     }
 
     /**
-     * Creates a new pet for a specific user.
+     * (Customer) Creates a new pet for a specific user.
+     * Default adoption status is 'not_available'.
      * @param array $data Associative array of pet data.
-     * @return int The ID of the newly created pet.
+     * @return int|false The ID of the newly created pet or false on error.
      */
     public function create($data) {
-        $sql = "INSERT INTO pets (user_id, pet_category, pet_breed, pet_age, medical_condition) 
-                VALUES (:userId, :category, :breed, :age, :medical)";
+        try {
+            // Updated SQL to include pet_name
+            $sql = "INSERT INTO pets (user_id, pet_name, pet_category, pet_breed, pet_age, medical_condition) 
+                    VALUES (:userId, :name, :category, :breed, :age, :medical)";
 
-        $stmt = $this->db->prepare($sql);
+            $stmt = $this->db->prepare($sql);
 
-        $stmt->bindParam(':userId', $data['user_id']);
-        $stmt->bindParam(':category', $data['pet_category']);
-        $stmt->bindParam(':breed', $data['pet_breed']);
-        $stmt->bindParam(':age', $data['pet_age']);
-        $stmt->bindParam(':medical', $data['medical_condition']);
+            $stmt->bindParam(':userId', $data['user_id']);
+            $stmt->bindParam(':name', $data['pet_name']);
+            $stmt->bindParam(':category', $data['pet_category']);
+            $stmt->bindParam(':breed', $data['pet_breed']);
+            $stmt->bindParam(':age', $data['pet_age']);
+            $stmt->bindParam(':medical', $data['medical_condition']);
 
-        $stmt->execute();
+            $stmt->execute();
 
-        // Return the ID of the new pet
-        return $this->db->lastInsertId();
+            return $this->db->lastInsertId();
+        } catch (PDOException $e) {
+            error_log("PetModels::create Error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * (Admin) Creates a new pet specifically for adoption.
+     * Sets adoption_status to 'available'.
+     * @param array $data Associative array of pet data.
+     * @return int|false The ID of the newly created pet or false on error.
+     */
+    public function createAdoptionPet($data) {
+        try {
+            $sql = "INSERT INTO pets (user_id, pet_name, pet_category, pet_breed, pet_age, medical_condition, adoption_status) 
+                    VALUES (:userId, :name, :category, :breed, :age, :medical, 'available')";
+
+            $stmt = $this->db->prepare($sql);
+
+            $stmt->bindParam(':userId', $data['user_id']);
+            $stmt->bindParam(':name', $data['pet_name']);
+            $stmt->bindParam(':category', $data['pet_category']);
+            $stmt->bindParam(':breed', $data['pet_breed']);
+            $stmt->bindParam(':age', $data['pet_age']);
+            $stmt->bindParam(':medical', $data['medical_condition']);
+
+            $stmt->execute();
+
+            return $this->db->lastInsertId();
+        } catch (PDOException $e) {
+            error_log("PetModels::createAdoptionPet Error: " . $e->getMessage());
+            return false;
+        }
     }
 
     /**
      * Updates an existing pet.
+     * Updated to include pet_name.
      * @param int $petId The ID of the pet to update.
      * @param int $userId The ID of the owner (for security).
      * @param array $data The new data.
      * @return bool True on success, false on failure.
      */
     public function update($petId, $userId, $data) {
-        $sql = "UPDATE pets SET 
-                    pet_category = :category, 
-                    pet_breed = :breed, 
-                    pet_age = :age, 
-                    medical_condition = :medical
-                WHERE pet_id = :petId AND user_id = :userId";
+        try {
+            // Updated SQL to include pet_name
+            $sql = "UPDATE pets SET 
+                        pet_name = :name,
+                        pet_category = :category, 
+                        pet_breed = :breed, 
+                        pet_age = :age, 
+                        medical_condition = :medical
+                    WHERE pet_id = :petId AND user_id = :userId";
 
-        $stmt = $this->db->prepare($sql);
+            $stmt = $this->db->prepare($sql);
 
-        $stmt->bindParam(':category', $data['pet_category']);
-        $stmt->bindParam(':breed', $data['pet_breed']);
-        $stmt->bindParam(':age', $data['pet_age']);
-        $stmt->bindParam(':medical', $data['medical_condition']);
-        $stmt->bindParam(':petId', $petId);
-        $stmt->bindParam(':userId', $userId);
+            $stmt->bindParam(':name', $data['pet_name']);
+            $stmt->bindParam(':category', $data['pet_category']);
+            $stmt->bindParam(':breed', $data['pet_breed']);
+            $stmt->bindParam(':age', $data['pet_age']);
+            $stmt->bindParam(':medical', $data['medical_condition']);
+            $stmt->bindParam(':petId', $petId);
+            $stmt->bindParam(':userId', $userId);
 
-        $stmt->execute();
+            $stmt->execute();
 
-        // rowCount() returns the number of rows affected.
-        // If it's > 0, the update was successful.
-        return $stmt->rowCount() > 0;
+            return true;
+        } catch (PDOException $e) {
+            error_log("PetModels::update Error: " . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -98,11 +141,27 @@ class PetModels {
      * @return bool True on success, false on failure.
      */
     public function delete($petId, $userId) {
-        $sql = "DELETE FROM pets WHERE pet_id = :petId AND user_id = :userId";
+        try {
+            $sql = "DELETE FROM pets WHERE pet_id = :petId AND user_id = :userId";
+            $stmt = $this->db->prepare($sql);
+            $stmt->bindParam(':petId', $petId);
+            $stmt->bindParam(':userId', $userId);
+            $stmt->execute();
+            return $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            error_log("PetModels::delete Error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * (Admin) Finds ALL pets in the database.
+     * @return array List of all pets.
+     */
+    public function findAll() {
+        $sql = "SELECT * FROM pets ORDER BY pet_id DESC";
         $stmt = $this->db->prepare($sql);
-        $stmt->bindParam(':petId', $petId);
-        $stmt->bindParam(':userId', $userId);
         $stmt->execute();
-        return $stmt->rowCount() > 0;
+        return $stmt->fetchAll();
     }
 }

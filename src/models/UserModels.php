@@ -13,10 +13,6 @@ class UserModels {
 
     /**
      * Finds a user by their ID.
-     * Useful for checking profile completeness before actions.
-     *
-     * @param int $userId The user's ID.
-     * @return mixed The user record as an array, or false if not found.
      */
     public function findById($userId) {
         try {
@@ -32,9 +28,6 @@ class UserModels {
 
     /**
      * Finds a user by their email address.
-     *
-     * @param string $email The user's email.
-     * @return mixed The user record as an array, or false if not found.
      */
     public function findByEmail($email) {
         try {
@@ -42,58 +35,61 @@ class UserModels {
             $stmt = $this->db->prepare($sql);
             $stmt->bindParam(':email', $email);
             $stmt->execute();
-
-            // fetch() returns the row or false if no row is found
             return $stmt->fetch();
         } catch (PDOException $e) {
-            // Log error
             return false;
         }
     }
 
     /**
+     * (Admin) Finds ALL users.
+     */
+    public function findAll() {
+        $sql = "SELECT user_id, first_name, last_name, email, phone, role, created_at FROM users ORDER BY created_at DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * --- NEW METHOD ---
+     * Finds all users with the role 'doctor'.
+     * @return array List of doctors.
+     */
+    public function findDoctors() {
+        // Select specific fields needed for the booking dropdown
+        $sql = "SELECT user_id, first_name, last_name, specialty, email FROM users WHERE role = 'doctor'";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    /**
      * Creates a new user in the database.
-     *
-     * @param array $data Associative array of user data
-     * @return bool True on success, false on failure.
      */
     public function create($data) {
-        // Get data from the array
         $firstName = $data['firstName'];
         $lastName = $data['lastName'];
         $email = $data['email'];
         $password = $data['password'];
-
-        // --- CRITICAL: Hash the password ---
-        // We use BCRYPT, the industry standard.
         $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
 
-        // The SQL query with named placeholders
         $sql = "INSERT INTO users (first_name, last_name, email, password, role) 
                 VALUES (:firstName, :lastName, :email, :password, :role)";
 
         try {
-            // Prepare the statement
             $stmt = $this->db->prepare($sql);
-
-            // Bind the values to the placeholders
             $stmt->bindParam(':firstName', $firstName);
             $stmt->bindParam(':lastName', $lastName);
             $stmt->bindParam(':email', $email);
             $stmt->bindParam(':password', $hashedPassword);
 
-            // New users default to 'user' role
             $defaultRole = 'user';
             $stmt->bindParam(':role', $defaultRole);
 
-            // Execute the statement
             $stmt->execute();
-
-            // Return true if the row was successfully inserted
             return $stmt->rowCount() > 0;
-
         } catch (PDOException $e) {
-            // This will catch errors, like if the email is already in use (UNIQUE constraint)
             return false;
         }
     }

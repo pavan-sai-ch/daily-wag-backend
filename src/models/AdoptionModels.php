@@ -61,6 +61,7 @@ class AdoptionModels {
      * (Admin) Finds all pending adoption requests.
      */
     public function findAllPendingRequests() {
+        // Fetches details about the request, the pet, and the user
         $sql = "SELECT a.*, p.pet_name, p.pet_breed, u.first_name, u.last_name 
                 FROM adoption a
                 JOIN pets p ON a.pet_id = p.pet_id
@@ -73,38 +74,51 @@ class AdoptionModels {
 
     /**
      * (Admin) Updates the status of an adoption request.
-     * If approved, it also marks the pet as 'adopted'.
-     * If denied, it marks the pet as 'available' again.
+     * If approved, it TRANSFERS OWNERSHIP and marks as 'adopted'.
      */
     public function updateStatus($adoptId, $status) {
         try {
             $this->db->beginTransaction();
 
-            // 1. Get the pet_id associated with this request
-            $getPetSql = "SELECT pet_id FROM adoption WHERE adopt_id = :adoptId";
-            $getStmt = $this->db->prepare($getPetSql);
+            // 1. Get the pet_id AND adopter_id associated with this request
+            // We need the adopter_id to transfer ownership!
+            $getDetailsSql = "SELECT pet_id, adopter_id FROM adoption WHERE adopt_id = :adoptId";
+            $getStmt = $this->db->prepare($getDetailsSql);
             $getStmt->bindParam(':adoptId', $adoptId);
             $getStmt->execute();
-            $pet = $getStmt->fetch();
+            $request = $getStmt->fetch();
 
-            if (!$pet) throw new Exception("Adoption request not found");
-            $petId = $pet['pet_id'];
+            if (!$request) throw new Exception("Adoption request not found");
+            $petId = $request['pet_id'];
+            $adopterId = $request['adopter_id'];
 
-            // 2. Update the adoption request status
+            // 2. Update the adoption request status (in the adoption table)
             $sql = "UPDATE adoption SET status = :status WHERE adopt_id = :adoptId";
             $stmt = $this->db->prepare($sql);
             $stmt->bindParam(':status', $status);
             $stmt->bindParam(':adoptId', $adoptId);
             $stmt->execute();
 
-            // 3. Update the pet's status based on the decision
-            $newPetStatus = ($status === 'approved') ? 'adopted' : 'available';
+            // 3. Update the PET table
+            if ($status === 'approved') {
+                // --- TRANSFER OWNERSHIP ---
+                // Change owner to the adopter AND set status to 'adopted'
+                $updateSql = "UPDATE pets SET 
+                                adoption_status = 'adopted', 
+                                user_id = :newOwnerId 
+                              WHERE pet_id = :petId";
 
-            $updateSql = "UPDATE pets SET adoption_status = :newStatus WHERE pet_id = :petId";
-            $updateStmt = $this->db->prepare($updateSql);
-            $updateStmt->bindParam(':newStatus', $newPetStatus);
-            $updateStmt->bindParam(':petId', $petId);
-            $updateStmt->execute();
+                $updateStmt = $this->db->prepare($updateSql);
+                $updateStmt->bindParam(':newOwnerId', $adopterId); // <--- The Magic Logic
+                $updateStmt->bindParam(':petId', $petId);
+                $updateStmt->execute();
+            } else {
+                // If denied, just set the pet back to 'available' (Owner stays as Admin)
+                $updateSql = "UPDATE pets SET adoption_status = 'available' WHERE pet_id = :petId";
+                $updateStmt = $this->db->prepare($updateSql);
+                $updateStmt->bindParam(':petId', $petId);
+                $updateStmt->execute();
+            }
 
             $this->db->commit();
             return true;

@@ -1,25 +1,29 @@
 <?php
 require_once __DIR__ . '/../Utils/Sanitize.php';
 require_once __DIR__ . '/../models/OrderModels.php';
-// We need the UserModel now to check the address
 require_once __DIR__ . '/../models/UserModels.php';
+require_once __DIR__ . '/../models/StoreModels.php'; // Needed for stock checks
 
 /**
  * Checkout Controller
- * Handles the conversion of a session cart into a permanent order.
+ * Handles the conversion of a session cart into a permanent order
+ * AND handles Admin order management.
  */
 class CheckoutController extends BaseController {
 
     private $orderModel;
-    private $userModel; // Add user model property
+    private $userModel;
+    private $storeModel;
 
     public function __construct($db) {
         $this->orderModel = new OrderModels($db);
-        $this->userModel = new UserModels($db); // Initialize user model
+        $this->userModel = new UserModels($db);
+        $this->storeModel = new StoreModels($db);
     }
 
     /**
      * Handles POST /api/checkout
+     * Converts the user's session cart into a database order.
      */
     public function processCheckout() {
         // 1. Authenticate User
@@ -50,7 +54,7 @@ class CheckoutController extends BaseController {
             return;
         }
 
-        // --- ADDRESS VALIDATION (NEW) ---
+        // --- ADDRESS VALIDATION ---
         // If the user chose 'delivery', they MUST have an address on file.
         if ($deliveryType === 'delivery') {
             $user = $this->userModel->findById($userId);
@@ -68,14 +72,20 @@ class CheckoutController extends BaseController {
             }
         }
 
-        // 4. Calculate Grand Total
-        // Never trust the total sent from the frontend!
+        // --- STOCK VALIDATION ---
+        // Before we charge the card, let's double-check that everything is still in stock
         $grandTotal = 0.0;
         foreach ($cartItems as $item) {
-            $grandTotal += $item['price'] * $item['quantity'];
+            $product = $this->storeModel->findById($item['item_id']);
+            if (!$product || $product['stock'] < $item['quantity']) {
+                $this->sendError("Sorry, '" . $item['name'] . "' is out of stock or unavailable.", 400);
+                return;
+            }
+            $grandTotal += $product['price'] * $item['quantity'];
         }
 
         // 5. Create Order Transaction
+        // This function handles the DB transaction (insert order, insert items, decrease stock)
         $orderId = $this->orderModel->createOrder($userId, $cartItems, $grandTotal, $paymentMethod, $deliveryType);
 
         if ($orderId) {
@@ -89,6 +99,98 @@ class CheckoutController extends BaseController {
             ], 201);
         } else {
             $this->sendError('Failed to place order. Please try again.', 500);
+        }
+    }
+
+    /**
+     * (User) GET /api/orders/user
+     * Gets all orders for the logged-in user.
+     */
+    public function getUserOrders() {
+        try {
+            // 1. Authenticate
+            $session = $this->authenticate();
+            $userId = $session['user_id'];
+
+            // 2. Fetch orders
+            $orders = $this->orderModel->getOrdersByUser($userId);
+
+            // 3. Send response
+            $this->sendResponse($orders, 200);
+
+        } catch (Exception $e) {
+            $this->sendError("Error: " . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * (Admin) GET /api/orders/all
+     * Gets all orders in the system.
+     */
+    public function getAllOrders() {
+        try {
+            $session = $this->authenticate();
+            if ($session['user_role'] !== 'admin') {
+                $this->sendError('Forbidden', 403);
+                return;
+            }
+
+            $orders = $this->orderModel->findAll();
+            $this->sendResponse($orders, 200);
+        } catch (Exception $e) {
+            $this->sendError("Error: " . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * (Admin) GET /api/orders/:id/items
+     * Gets the specific items within an order.
+     */
+    public function getOrderItems($orderId) {
+        try {
+            $session = $this->authenticate();
+            if ($session['user_role'] !== 'admin') {
+                $this->sendError('Forbidden', 403);
+                return;
+            }
+
+            $items = $this->orderModel->findOrderItems($orderId);
+            $this->sendResponse($items, 200);
+        } catch (Exception $e) {
+            $this->sendError("Error: " . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * (Admin) PUT /api/orders/:id/status
+     * Updates the status of an order.
+     */
+    public function updateOrderStatus($orderId) {
+        try {
+            $session = $this->authenticate();
+            if ($session['user_role'] !== 'admin') {
+                $this->sendError('Forbidden', 403);
+                return;
+            }
+
+            $data = $this->getRequestData();
+            $status = $data['status'];
+            // Validate status against ENUM list from DB schema
+            $validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+
+            if (!in_array($status, $validStatuses)) {
+                $this->sendError('Invalid status.', 400);
+                return;
+            }
+
+            $success = $this->orderModel->updateStatus($orderId, $status);
+            if ($success) {
+                $this->sendResponse(['status' => 'success', 'message' => 'Order status updated.'], 200);
+            } else {
+                $this->sendError('Failed to update order.', 500);
+            }
+        } catch (Exception $e) {
+            $this->sendError("Error: " . $e->getMessage(), 500);
         }
     }
 }
