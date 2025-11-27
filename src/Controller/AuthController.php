@@ -9,6 +9,9 @@ class AuthController extends BaseController {
         $this->userModel = new UserModels($db);
     }
 
+    /**
+     * Handles POST /api/auth/register
+     */
     public function register() {
         $data = $this->getRequestData();
         $data = Sanitize::all($data);
@@ -42,6 +45,9 @@ class AuthController extends BaseController {
         }
     }
 
+    /**
+     * Handles POST /api/auth/login
+     */
     public function login() {
         $data = $this->getRequestData();
         $data = Sanitize::all($data);
@@ -59,7 +65,10 @@ class AuthController extends BaseController {
                 return;
             }
 
+            // Regenerate session ID to prevent session fixation
             session_regenerate_id(true);
+
+            // Store user data in session
             $_SESSION['user_id'] = $user['user_id'];
             $_SESSION['user_role'] = $user['role'];
             $_SESSION['user_first_name'] = $user['first_name'];
@@ -71,7 +80,9 @@ class AuthController extends BaseController {
                     'firstName' => $user['first_name'],
                     'lastName' => $user['last_name'],
                     'email' => $user['email'],
-                    'role' => $user['role']
+                    'role' => $user['role'],
+                    'address' => $user['address'], // Send address so frontend can validate checkout
+                    'phone' => $user['phone']
                 ]
             ], 200);
 
@@ -80,6 +91,10 @@ class AuthController extends BaseController {
         }
     }
 
+    /**
+     * Handles GET /api/auth/me
+     * Used by frontend to check if session is valid on page reload.
+     */
     public function checkSession() {
         if (!isset($_SESSION['user_id'])) {
             $this->sendResponse(['authenticated' => false], 200);
@@ -102,7 +117,9 @@ class AuthController extends BaseController {
                     'firstName' => $user['first_name'],
                     'lastName' => $user['last_name'],
                     'email' => $user['email'],
-                    'role' => $user['role']
+                    'role' => $user['role'],
+                    'address' => $user['address'],
+                    'phone' => $user['phone']
                 ]
             ], 200);
 
@@ -111,6 +128,67 @@ class AuthController extends BaseController {
         }
     }
 
+    /**
+     * Handles PUT /api/auth/profile
+     * Updates the logged-in user's profile (address, phone, name).
+     */
+    public function updateProfile() {
+        try {
+            // 1. Authenticate
+            $session = $this->authenticate();
+            $userId = $session['user_id'];
+
+            // 2. Get Data
+            $data = $this->getRequestData();
+            $data = Sanitize::all($data);
+
+            // 3. Validation
+            if (empty($data['first_name']) || empty($data['last_name'])) {
+                $this->sendError('First name and Last name are required.', 400);
+                return;
+            }
+
+            // 4. Update Database
+            $success = $this->userModel->updateProfile($userId, [
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'phone' => $data['phone'] ?? null,
+                'address' => $data['address'] ?? null
+            ]);
+
+            if ($success) {
+                // Fetch fresh user data to return
+                $updatedUser = $this->userModel->findById($userId);
+
+                // Update session data if name changed
+                $_SESSION['user_first_name'] = $updatedUser['first_name'];
+
+                $this->sendResponse([
+                    'status' => 'success',
+                    'message' => 'Profile updated successfully.',
+                    'user' => [
+                        'id' => $updatedUser['user_id'],
+                        'firstName' => $updatedUser['first_name'],
+                        'lastName' => $updatedUser['last_name'],
+                        'email' => $updatedUser['email'],
+                        'role' => $updatedUser['role'],
+                        'phone' => $updatedUser['phone'],
+                        'address' => $updatedUser['address']
+                    ]
+                ], 200);
+            } else {
+                $this->sendError('Failed to update profile.', 500);
+            }
+
+        } catch (Exception $e) {
+            $this->sendError("Error: " . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * (Admin) GET /api/users
+     * Fetches all users in the system.
+     */
     public function getAllUsers() {
         try {
             $session = $this->authenticate();
@@ -128,7 +206,6 @@ class AuthController extends BaseController {
     }
 
     /**
-     * --- NEW METHOD ---
      * Handles GET /api/doctors
      * Public route to get a list of doctors for booking.
      */

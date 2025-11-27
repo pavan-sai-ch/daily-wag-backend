@@ -6,19 +6,19 @@ services:
       dockerfile: dockerfile
     container_name: dailywag_php
     ports:
-      # Reads the port from your .env file (e.g., "8080:80")
       - "${PHP_PORT}:80"
     volumes:
-      # Mounts the current project directory using an absolute path
       - ${PWD}:/var/www/html/
-
-    # Passes .env variables into the PHP container
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       FRONTEND_URL: ${FRONTEND_URL}
-
+      # AWS Config
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+      AWS_BUCKET: ${AWS_BUCKET}
     depends_on:
       - db
 
@@ -26,19 +26,18 @@ services:
   db:
     image: mysql:latest
     container_name: dailywag_db
+
+    # No command needed for MySQL 9.5+ default auth
+
     environment:
-      # All credentials now read from the .env file
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
     ports:
-      # Reads the port from your .env file (e.g., "3306:3306")
       - "${MYSQL_PORT}:3306"
     volumes:
-      # This script will run the first time the container starts
       - ./sql/init:/docker-entrypoint-initdb.d
-      # This named volume persists your data
       - db-data:/var/lib/mysql
 
   # --- 3. phpMyAdmin Service ---
@@ -46,17 +45,18 @@ services:
     image: phpmyadmin
     container_name: dailywag_phpmyadmin
     environment:
-      PMA_HOST: db # Connects to the 'db' service above
-      # Credentials read from the .env file
+      PMA_HOST: db
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      # --- THE FIX IS HERE ---
+      # This base64 string decodes to: $cfg['Scheme'] = 'http';
+      # It forces phpMyAdmin to allow cookies over HTTP.
+      PMA_USER_CONFIG_BASE64: JGNmZ1snU2NoZW1lJ10gPSAnaHR0cCc7
     ports:
-      # Reads the port from your .env file (e.g., "8082:80")
       - "${PMA_PORT}:80"
     depends_on:
       - db
 
-# Define the named volume for database persistence
 volumes:
   db-data:

@@ -23,26 +23,20 @@ require_once __DIR__ . '/../src/Core/BaseController.php';
 require_once __DIR__ . '/../src/Core/Router.php';
 require_once __DIR__ . '/../src/Utils/Sanitize.php';
 
-// 4. Load All Controllers & Models
+// 4. Load All Your Controllers & Models
 require_once __DIR__ . '/../src/Controller/AuthController.php';
 require_once __DIR__ . '/../src/models/UserModels.php';
-
 require_once __DIR__ . '/../src/Controller/PetController.php';
 require_once __DIR__ . '/../src/models/PetModels.php';
-
 require_once __DIR__ . '/../src/Controller/BookingController.php';
 require_once __DIR__ . '/../src/models/BookingModels.php';
-
 require_once __DIR__ . '/../src/Controller/StoreController.php';
 require_once __DIR__ . '/../src/models/StoreModels.php';
 require_once __DIR__ . '/../src/Controller/CartController.php';
 require_once __DIR__ . '/../src/Controller/CheckoutController.php';
 require_once __DIR__ . '/../src/models/OrderModels.php';
-
 require_once __DIR__ . '/../src/Controller/AdoptionController.php';
 require_once __DIR__ . '/../src/models/AdoptionModels.php';
-
-// --- NEW: Load Schedule Files ---
 require_once __DIR__ . '/../src/Controller/ScheduleController.php';
 require_once __DIR__ . '/../src/models/ScheduleModels.php';
 
@@ -51,7 +45,7 @@ require_once __DIR__ . '/../src/models/ScheduleModels.php';
 $requestMethod = $_SERVER["REQUEST_METHOD"];
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// 6. Initialize Router & Database
+// 6. Initialize the Router & DB Connection
 $router = new Router();
 $dbConnection = (new Database())->getConnection();
 
@@ -61,7 +55,7 @@ if ($dbConnection === null) {
     exit();
 }
 
-// --- 7. Define API Routes ---
+// --- 7. Define Your API Routes ---
 
 // Test Route
 $router->add('GET', '/api/test', function() {
@@ -73,6 +67,7 @@ $authController = new AuthController($dbConnection);
 $router->add('POST', '/api/auth/register', [$authController, 'register']);
 $router->add('POST', '/api/auth/login', [$authController, 'login']);
 $router->add('GET', '/api/auth/me', [$authController, 'checkSession']);
+$router->add('PUT', '/api/auth/profile', [$authController, 'updateProfile']);
 $router->add('GET', '/api/users', [$authController, 'getAllUsers']);
 $router->add('GET', '/api/doctors', [$authController, 'getDoctors']);
 
@@ -121,15 +116,12 @@ $router->add('POST', '/api/adoption/request', [$adoptionController, 'requestAdop
 $router->add('GET', '/api/adoption/pending', [$adoptionController, 'getPendingRequests']);
 $router->add('PUT', '/api/adoption/:id/status', [$adoptionController, 'updateRequestStatus']);
 
-// --- NEW: Scheduling Routes ---
+// Scheduling Routes
 $scheduleController = new ScheduleController($dbConnection);
-// Set Hours (Admin/Doctor)
 $router->add('POST', '/api/schedule', [$scheduleController, 'setSchedule']);
-// Get Hours (Admin/Doctor)
 $router->add('GET', '/api/schedule', [$scheduleController, 'getSchedule']);
-// Get Available Slots (User)
 $router->add('GET', '/api/slots', [$scheduleController, 'getAvailableSlots']);
 
 
-// 8. Dispatch
+// 8. Dispatch the Router
 $router->dispatch($requestMethod, $requestUri);

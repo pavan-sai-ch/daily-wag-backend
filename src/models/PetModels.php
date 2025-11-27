@@ -40,14 +40,14 @@ class PetModels {
     /**
      * (Customer) Creates a new pet for a specific user.
      * Default adoption status is 'not_available'.
-     * @param array $data Associative array of pet data.
+     * UPDATED: Now saves photo_url.
+     * * @param array $data Associative array of pet data.
      * @return int|false The ID of the newly created pet or false on error.
      */
     public function create($data) {
         try {
-            // Updated SQL to include pet_name
-            $sql = "INSERT INTO pets (user_id, pet_name, pet_category, pet_breed, pet_age, medical_condition) 
-                    VALUES (:userId, :name, :category, :breed, :age, :medical)";
+            $sql = "INSERT INTO pets (user_id, pet_name, pet_category, pet_breed, pet_age, medical_condition, photo_url) 
+                    VALUES (:userId, :name, :category, :breed, :age, :medical, :photoUrl)";
 
             $stmt = $this->db->prepare($sql);
 
@@ -57,6 +57,10 @@ class PetModels {
             $stmt->bindParam(':breed', $data['pet_breed']);
             $stmt->bindParam(':age', $data['pet_age']);
             $stmt->bindParam(':medical', $data['medical_condition']);
+
+            // Handle potential null photo
+            $photoUrl = isset($data['photo_url']) ? $data['photo_url'] : null;
+            $stmt->bindParam(':photoUrl', $photoUrl);
 
             $stmt->execute();
 
@@ -70,13 +74,14 @@ class PetModels {
     /**
      * (Admin) Creates a new pet specifically for adoption.
      * Sets adoption_status to 'available'.
-     * @param array $data Associative array of pet data.
+     * UPDATED: Now saves photo_url.
+     * * @param array $data Associative array of pet data.
      * @return int|false The ID of the newly created pet or false on error.
      */
     public function createAdoptionPet($data) {
         try {
-            $sql = "INSERT INTO pets (user_id, pet_name, pet_category, pet_breed, pet_age, medical_condition, adoption_status) 
-                    VALUES (:userId, :name, :category, :breed, :age, :medical, 'available')";
+            $sql = "INSERT INTO pets (user_id, pet_name, pet_category, pet_breed, pet_age, medical_condition, photo_url, adoption_status) 
+                    VALUES (:userId, :name, :category, :breed, :age, :medical, :photoUrl, 'available')";
 
             $stmt = $this->db->prepare($sql);
 
@@ -86,6 +91,9 @@ class PetModels {
             $stmt->bindParam(':breed', $data['pet_breed']);
             $stmt->bindParam(':age', $data['pet_age']);
             $stmt->bindParam(':medical', $data['medical_condition']);
+
+            $photoUrl = isset($data['photo_url']) ? $data['photo_url'] : null;
+            $stmt->bindParam(':photoUrl', $photoUrl);
 
             $stmt->execute();
 
@@ -98,15 +106,15 @@ class PetModels {
 
     /**
      * Updates an existing pet.
-     * Updated to include pet_name.
-     * @param int $petId The ID of the pet to update.
+     * * @param int $petId The ID of the pet to update.
      * @param int $userId The ID of the owner (for security).
      * @param array $data The new data.
      * @return bool True on success, false on failure.
      */
     public function update($petId, $userId, $data) {
         try {
-            // Updated SQL to include pet_name
+            // Note: We typically don't update photo_url here unless specifically requested,
+            // as standard edit forms often don't re-upload the image.
             $sql = "UPDATE pets SET 
                         pet_name = :name,
                         pet_category = :category, 
