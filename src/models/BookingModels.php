@@ -27,16 +27,20 @@ class BookingModels {
 
         $stmt = $this->db->prepare($sql);
 
-        // Bind all parameters
-        $stmt->bindParam(':userId', $data['user_id']);
-        $stmt->bindParam(':petId', $data['pet_id']);
+        // Use bindValue instead of bindParam for safer handling, especially for nullable fields
+        $stmt->bindValue(':userId', $data['user_id']);
+        $stmt->bindValue(':petId', $data['pet_id']);
 
-        // doctor_id can be null for grooming
-        $stmt->bindParam(':doctorId', $data['doctor_id'], $data['doctor_id'] === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        // Handle nullable doctor_id safely
+        if (empty($data['doctor_id'])) {
+            $stmt->bindValue(':doctorId', null, PDO::PARAM_NULL);
+        } else {
+            $stmt->bindValue(':doctorId', $data['doctor_id'], PDO::PARAM_INT);
+        }
 
-        $stmt->bindParam(':bookingType', $data['booking_type']);
-        $stmt->bindParam(':bookingDate', $data['booking_date']);
-        $stmt->bindParam(':serviceType', $data['service_type']);
+        $stmt->bindValue(':bookingType', $data['booking_type']);
+        $stmt->bindValue(':bookingDate', $data['booking_date']);
+        $stmt->bindValue(':serviceType', $data['service_type']);
 
         $stmt->execute();
 
@@ -52,23 +56,24 @@ class BookingModels {
     public function findByUserId($userId) {
         $sql = "SELECT * FROM bookings WHERE user_id = :userId ORDER BY booking_date DESC";
         $stmt = $this->db->prepare($sql);
-        $stmt->bindParam(':userId', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':userId', $userId, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
     }
 
     /**
      * Finds all bookings for a specific doctor.
+     * Includes joining with pets and users tables for detail display.
      *
      * @param int $doctorId The doctor's user_id.
      * @return array A list of the doctor's bookings.
      */
     public function findByDoctorId($doctorId) {
-        // We also join with pets and users to get their names for the doctor's schedule
         $sql = "SELECT 
                     b.*, 
                     p.pet_category, 
                     p.pet_breed,
+                    p.pet_name,
                     u.first_name AS owner_first_name,
                     u.last_name AS owner_last_name
                 FROM bookings b
@@ -78,7 +83,7 @@ class BookingModels {
                 ORDER BY b.booking_date ASC";
 
         $stmt = $this->db->prepare($sql);
-        $stmt->bindParam(':doctorId', $doctorId, PDO::PARAM_INT);
+        $stmt->bindValue(':doctorId', $doctorId, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
     }
@@ -96,7 +101,7 @@ class BookingModels {
     }
 
     /**
-     * Updates the status of a booking (for an admin).
+     * Updates the status of a booking.
      *
      * @param int $bookingId The ID of the booking to update.
      * @param string $status The new status.
@@ -105,9 +110,46 @@ class BookingModels {
     public function updateStatus($bookingId, $status) {
         $sql = "UPDATE bookings SET status = :status WHERE booking_id = :bookingId";
         $stmt = $this->db->prepare($sql);
-        $stmt->bindParam(':status', $status);
-        $stmt->bindParam(':bookingId', $bookingId, PDO::PARAM_INT);
+        $stmt->bindValue(':status', $status);
+        $stmt->bindValue(':bookingId', $bookingId, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Gets a list of times that are already booked for a specific provider on a specific date.
+     * This is used by the ScheduleController to determine available slots.
+     *
+     * @param int|null $doctorId The doctor ID (or null for grooming).
+     * @param string $date The date to check (YYYY-MM-DD).
+     * @return array Array of time strings (e.g., ['09:30:00', '10:00:00']).
+     */
+    public function getBookedTimes($doctorId, $date) {
+        // We only care about the TIME part of the booking_date for comparison
+        // We filter out Cancelled appointments so those slots become free again.
+        $sql = "SELECT TIME(booking_date) as booked_time 
+                FROM bookings 
+                WHERE DATE(booking_date) = :date 
+                AND status != 'Cancelled'";
+
+        // If doctorId is provided, filter by that doctor
+        if ($doctorId) {
+            $sql .= " AND doctor_id = :doctorId";
+        } else {
+            // If no doctorId (grooming), filter where doctor_id is NULL
+            $sql .= " AND doctor_id IS NULL";
+        }
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':date', $date);
+
+        if ($doctorId) {
+            $stmt->bindValue(':doctorId', $doctorId, PDO::PARAM_INT);
+        }
+
+        $stmt->execute();
+
+        // Fetch specific column to return a simple flat array [time1, time2]
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 }
