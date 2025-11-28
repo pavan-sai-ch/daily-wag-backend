@@ -27,7 +27,7 @@ WORKDIR /var/www/html
 # We copy just these files first so Docker can cache the installed dependencies.
 # If you don't change composer.json, Docker won't re-run the slow install step.
 COPY composer.json ./
-
+COPY php.ini /usr/local/etc/php/php.ini
 # 7. Install Dependencies
 # This reads composer.json and downloads the AWS SDK into /var/www/html/vendor
 # --no-scripts and --no-autoloader make it faster and safer for building

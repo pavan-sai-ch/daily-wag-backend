@@ -25,10 +25,10 @@ class PetController extends BaseController {
             return 'File upload error code: ' . $file['error'];
         }
 
-        // 2. Check file size (Max 3MB)
-        $maxSize = 3 * 1024 * 1024; // 3MB in bytes
+        // 2. Check file size (Max 10MB)
+        $maxSize = 10 * 1024 * 1024; // 10MB in bytes
         if ($file['size'] > $maxSize) {
-            return 'File size exceeds the maximum limit of 3MB.';
+            return 'File size exceeds the maximum limit of 10MB.';
         }
 
         // 3. Check file type (Allow JPG, PNG, GIF, WEBP)
@@ -129,14 +129,35 @@ class PetController extends BaseController {
      * (Customer) PUT /api/pets/:id
      * Updates an existing pet.
      */
+    // ... existing code ...
+
+    /**
+     * (Customer) PUT /api/pets/:id
+     * Updates an existing pet.
+     */
     public function updatePet($petId) {
         try {
             $session = $this->authenticate();
             $userId = $session['user_id'];
 
-            // For PUT requests, PHP doesn't parse multipart/form-data automatically.
-            // Typically handled via JSON for text updates.
-            $data = $this->getRequestData();
+            // 1. Determine if this is a Multipart (File) or JSON request
+            // PUT requests with files are tricky in PHP.
+            // We will support both JSON (for text-only updates)
+            // and $_POST (for file updates, requires the client to send POST with _method=PUT or just handle POST to this URL).
+
+            // HACK: If content-type is multipart/form-data, PHP might have populated $_POST and $_FILES
+            // even if the method was PUT, or we might need to read php://input.
+            // To make this robust for file uploads, the frontend 'updatePet' service
+            // should ideally send a POST request if a file is present.
+
+            // Let's assume we might get data from $_POST if a file is uploaded
+            if (!empty($_FILES)) {
+                $data = $_POST;
+            } else {
+                // Fallback to JSON input
+                $data = $this->getRequestData();
+            }
+
             $data = Sanitize::all($data);
 
             if (empty($data['pet_name']) || empty($data['pet_category']) || empty($data['pet_breed']) || empty($data['pet_age'])) {
@@ -144,10 +165,35 @@ class PetController extends BaseController {
                 return;
             }
 
+            // --- NEW: IMAGE UPLOAD LOGIC (Copied from addPet) ---
+            if (isset($_FILES['image'])) {
+                $validation = $this->validateImage($_FILES['image']);
+                if ($validation !== true) {
+                    $this->sendError($validation, 400);
+                    return;
+                }
+
+                $photoUrl = $this->s3->upload($_FILES['image'], 'pets');
+                if ($photoUrl) {
+                    $data['photo_url'] = $photoUrl; // Add new URL to data
+
+                    // Optional: Delete old image?
+                    // $oldPet = $this->petModel->findOne($petId, $userId);
+                    // if ($oldPet && $oldPet['photo_url']) $this->s3->delete($oldPet['photo_url']);
+                }
+            }
+            // ----------------------------------------------------
+
+            // We pass the petId and userId to the model
             $success = $this->petModel->update($petId, $userId, $data);
 
             if ($success) {
-                $this->sendResponse(['status' => 'success', 'message' => 'Pet updated successfully.'], 200);
+                // Return the updated photo URL so the frontend can update immediately
+                $response = ['status' => 'success', 'message' => 'Pet updated successfully.'];
+                if (isset($data['photo_url'])) {
+                    $response['photo_url'] = $data['photo_url'];
+                }
+                $this->sendResponse($response, 200);
             } else {
                 $this->sendError('Could not update pet. Check ownership.', 404);
             }
@@ -156,6 +202,8 @@ class PetController extends BaseController {
             $this->sendError("An error occurred: " . $e->getMessage(), 500);
         }
     }
+
+// ... existing code ...
 
     /**
      * (Customer) DELETE /api/pets/:id

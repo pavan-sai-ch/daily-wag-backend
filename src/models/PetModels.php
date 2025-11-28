@@ -113,15 +113,20 @@ class PetModels {
      */
     public function update($petId, $userId, $data) {
         try {
-            // Note: We typically don't update photo_url here unless specifically requested,
-            // as standard edit forms often don't re-upload the image.
+            // Build SQL dynamically to handle optional photo_url
             $sql = "UPDATE pets SET 
                         pet_name = :name,
                         pet_category = :category, 
                         pet_breed = :breed, 
                         pet_age = :age, 
-                        medical_condition = :medical
-                    WHERE pet_id = :petId AND user_id = :userId";
+                        medical_condition = :medical";
+
+            // Only update photo_url if it's in the data array
+            if (isset($data['photo_url'])) {
+                $sql .= ", photo_url = :photoUrl";
+            }
+
+            $sql .= " WHERE pet_id = :petId AND user_id = :userId";
 
             $stmt = $this->db->prepare($sql);
 
@@ -132,6 +137,10 @@ class PetModels {
             $stmt->bindParam(':medical', $data['medical_condition']);
             $stmt->bindParam(':petId', $petId);
             $stmt->bindParam(':userId', $userId);
+
+            if (isset($data['photo_url'])) {
+                $stmt->bindParam(':photoUrl', $data['photo_url']);
+            }
 
             $stmt->execute();
 
