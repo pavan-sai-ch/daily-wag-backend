@@ -27,7 +27,7 @@ class BookingModels {
 
         $stmt = $this->db->prepare($sql);
 
-        // Use bindValue instead of bindParam for safer handling, especially for nullable fields
+        // Use bindValue for safer handling
         $stmt->bindValue(':userId', $data['user_id']);
         $stmt->bindValue(':petId', $data['pet_id']);
 
@@ -59,6 +59,19 @@ class BookingModels {
         $stmt->bindValue(':userId', $userId, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
+    }
+
+    /**
+     * Finds a specific booking by ID.
+     * @param int $bookingId
+     * @return mixed Booking row or false
+     */
+    public function findById($bookingId) {
+        $sql = "SELECT * FROM bookings WHERE booking_id = :id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':id', $bookingId);
+        $stmt->execute();
+        return $stmt->fetch();
     }
 
     /**
@@ -118,7 +131,7 @@ class BookingModels {
 
     /**
      * Gets a list of times that are already booked for a specific provider on a specific date.
-     * This is used by the ScheduleController to determine available slots.
+     * Used by the ScheduleController to determine available slots.
      *
      * @param int|null $doctorId The doctor ID (or null for grooming).
      * @param string $date The date to check (YYYY-MM-DD).
@@ -151,5 +164,42 @@ class BookingModels {
 
         // Fetch specific column to return a simple flat array [time1, time2]
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+
+    /**
+     * Marks a booking as Checked In.
+     */
+    public function checkIn($bookingId) {
+        $now = date('Y-m-d H:i:s');
+        $sql = "UPDATE bookings SET status = 'Checked In', checkin_time = :now WHERE booking_id = :id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':now', $now);
+        $stmt->bindParam(':id', $bookingId);
+        return $stmt->execute();
+    }
+
+    /**
+     * Automatically updates statuses based on time rules.
+     * Runs whenever bookings are fetched to keep data fresh.
+     */
+    public function autoUpdateStatuses() {
+        // Rule 1: Auto 'No Show'
+        // IF Status is 'Confirmed' AND (Current Time > Booking Time + 1 Hour)
+        // THEN set Status = 'No Show'
+        $sqlNoShow = "UPDATE bookings 
+                      SET status = 'No Show' 
+                      WHERE status = 'Confirmed' 
+                      AND booking_date < DATE_SUB(NOW(), INTERVAL 1 HOUR)";
+        $this->db->query($sqlNoShow);
+
+        // Rule 2: Auto 'Completed'
+        // IF Status is 'Checked In' AND (Current Time > Booking Time + 1 Hour)
+        // THEN set Status = 'Completed'
+        // (Assuming a standard appointment lasts 1 hour)
+        $sqlComplete = "UPDATE bookings 
+                        SET status = 'Completed' 
+                        WHERE status = 'Checked In' 
+                        AND booking_date < DATE_SUB(NOW(), INTERVAL 1 HOUR)";
+        $this->db->query($sqlComplete);
     }
 }

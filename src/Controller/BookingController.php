@@ -1,28 +1,22 @@
 <?php
 require_once __DIR__ . '/../Utils/Sanitize.php';
+require_once __DIR__ . '/../models/BookingModels.php';
+// We need to fetch user details/schedule sometimes, so good to have access if needed
+// require_once __DIR__ . '/../models/UserModels.php';
 
-/**
- * Booking Controller
- * Handles all API requests for /api/bookings
- */
 class BookingController extends BaseController {
 
     private $bookingModel;
 
     public function __construct($db) {
-        // All controllers must call the parent constructor
-        // We will add this to AuthController and PetController later
-        // parent::__construct();
-
         $this->bookingModel = new BookingModels($db);
     }
 
-    /**
-     * Handles POST /api/bookings/grooming
-     */
+    // ... (Keep addGroomingBooking, addMedicalBooking as they are) ...
+
     public function addGroomingBooking() {
         try {
-            $session = $this->authenticate(); // Check login
+            $session = $this->authenticate();
             $userId = $session['user_id'];
 
             $data = $this->getRequestData();
@@ -33,12 +27,14 @@ class BookingController extends BaseController {
                 return;
             }
 
+            $formattedDate = str_replace('T', ' ', $data['booking_date']);
+
             $bookingData = [
                 'user_id' => $userId,
                 'pet_id' => (int)$data['pet_id'],
-                'doctor_id' => null, // No doctor for grooming
+                'doctor_id' => null,
                 'booking_type' => 'grooming',
-                'booking_date' => $data['booking_date'],
+                'booking_date' => $formattedDate,
                 'service_type' => $data['service_type']
             ];
 
@@ -50,12 +46,9 @@ class BookingController extends BaseController {
         }
     }
 
-    /**
-     * Handles POST /api/bookings/medical
-     */
     public function addMedicalBooking() {
         try {
-            $session = $this->authenticate(); // Check login
+            $session = $this->authenticate();
             $userId = $session['user_id'];
 
             $data = $this->getRequestData();
@@ -65,8 +58,6 @@ class BookingController extends BaseController {
                 $this->sendError('pet_id, doctor_id, booking_date, and service_type are required.', 400);
                 return;
             }
-
-            // TODO: Here you should add logic to check if the doctor_id is a valid doctor
 
             $bookingData = [
                 'user_id' => $userId,
@@ -85,14 +76,13 @@ class BookingController extends BaseController {
         }
     }
 
-    /**
-     * Handles GET /api/bookings/user
-     * Gets all bookings for the currently logged-in user.
-     */
     public function getUserBookings() {
         try {
             $session = $this->authenticate();
             $userId = $session['user_id'];
+
+            // Optional: Run auto-update logic here if you implemented it in Model
+            // $this->bookingModel->autoUpdateStatuses();
 
             $bookings = $this->bookingModel->findByUserId($userId);
 
@@ -103,17 +93,11 @@ class BookingController extends BaseController {
         }
     }
 
-    /**
-     * Handles GET /api/bookings/doctor
-     * Gets all bookings for the currently logged-in doctor.
-     */
     public function getDoctorBookings() {
         try {
             $session = $this->authenticate();
-
-            // Check if the user is a doctor
             if ($session['user_role'] !== 'doctor') {
-                $this->sendError('Forbidden: You must be a doctor to access this resource.', 403);
+                $this->sendError('Forbidden', 403);
                 return;
             }
 
@@ -127,14 +111,11 @@ class BookingController extends BaseController {
         }
     }
 
-    /**
-     * Handles GET /api/bookings/all (Admin Only)
-     */
     public function getAllBookings() {
         try {
             $session = $this->authenticate();
             if ($session['user_role'] !== 'admin') {
-                $this->sendError('Forbidden: Admin access required.', 403);
+                $this->sendError('Forbidden', 403);
                 return;
             }
 
@@ -146,21 +127,20 @@ class BookingController extends BaseController {
         }
     }
 
-    /**
-     * Handles PUT /api/bookings/:id/status (Admin Only)
-     */
     public function updateBookingStatus($bookingId) {
         try {
             $session = $this->authenticate();
             if ($session['user_role'] !== 'admin') {
-                $this->sendError('Forbidden: Admin access required.', 403);
+                $this->sendError('Forbidden', 403);
                 return;
             }
 
             $data = $this->getRequestData();
             $status = Sanitize::string($data['status']);
 
-            if (empty($status) || !in_array($status, ['Pending', 'Confirmed', 'Cancelled', 'Completed'])) {
+            // Updated valid statuses to include new ones
+            $validStatuses = ['Pending', 'Confirmed', 'Checked In', 'Completed', 'Cancelled', 'No Show'];
+            if (empty($status) || !in_array($status, $validStatuses)) {
                 $this->sendError('Invalid status provided.', 400);
                 return;
             }
@@ -175,6 +155,64 @@ class BookingController extends BaseController {
 
         } catch (Exception $e) {
             $this->sendError("An error occurred: " . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * --- MANUAL CHECK-IN (UPDATED) ---
+     * Handles PUT /api/bookings/:id/checkin
+     * Enforces the 1-hour window rule.
+     */
+    public function checkIn($bookingId) {
+        try {
+            $session = $this->authenticate();
+            $userId = $session['user_id'];
+
+            // 1. Fetch the booking to verify ownership and time
+            $booking = $this->bookingModel->findById($bookingId);
+
+            if (!$booking) {
+                $this->sendError('Booking not found.', 404);
+                return;
+            }
+
+            // Verify ownership
+            if ($booking['user_id'] != $userId) {
+                $this->sendError('Forbidden: This is not your booking.', 403);
+                return;
+            }
+
+            // 2. Validate Time Window (1 Hour Rule)
+            $bookingTime = strtotime($booking['booking_date']);
+            $now = time();
+            $oneHourBefore = $bookingTime - 3600; // 1 hour in seconds
+            $fifteenMinsAfter = $bookingTime + (15 * 60); // 15 min grace period
+
+            // --- UNCOMMENTED AND ACTIVE LOGIC ---
+            if ($now < $oneHourBefore) {
+                // Calculate minutes remaining for helpful error message
+                $minsWait = ceil(($oneHourBefore - $now) / 60);
+                $this->sendError("Too early. Check-in opens in $minsWait minutes.", 400);
+                return;
+            }
+
+            if ($now > $fifteenMinsAfter) {
+                $this->sendError('Too late. Appointment missed.', 400);
+                return;
+            }
+            // ------------------------------------
+
+            if ($booking['status'] !== 'Confirmed') {
+                $this->sendError('Booking must be Confirmed before checking in.', 400);
+                return;
+            }
+
+            // 3. Update Status
+            $this->bookingModel->checkIn($bookingId);
+            $this->sendResponse(['status' => 'success', 'message' => 'Checked in successfully!'], 200);
+
+        } catch (Exception $e) {
+            $this->sendError("Error: " . $e->getMessage(), 500);
         }
     }
 }

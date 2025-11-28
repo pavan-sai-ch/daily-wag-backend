@@ -22,9 +22,9 @@ require_once __DIR__ . '/../src/Config/pdo.php';
 require_once __DIR__ . '/../src/Core/BaseController.php';
 require_once __DIR__ . '/../src/Core/Router.php';
 require_once __DIR__ . '/../src/Utils/Sanitize.php';
-require_once __DIR__ . '/../src/Utils/S3Uploader.php'; // Load S3 Uploader
+require_once __DIR__ . '/../src/Utils/S3Uploader.php';
 
-// 4. Load All Your Controllers & Models
+// 4. Load All Controllers & Models
 require_once __DIR__ . '/../src/Controller/AuthController.php';
 require_once __DIR__ . '/../src/models/UserModels.php';
 
@@ -38,7 +38,6 @@ require_once __DIR__ . '/../src/Controller/StoreController.php';
 require_once __DIR__ . '/../src/models/StoreModels.php';
 
 require_once __DIR__ . '/../src/Controller/CartController.php';
-
 require_once __DIR__ . '/../src/Controller/CheckoutController.php';
 require_once __DIR__ . '/../src/models/OrderModels.php';
 
@@ -47,15 +46,18 @@ require_once __DIR__ . '/../src/models/AdoptionModels.php';
 
 require_once __DIR__ . '/../src/Controller/ScheduleController.php';
 require_once __DIR__ . '/../src/models/ScheduleModels.php';
-require_once __DIR__ . '/../src/Controller/ImmunizationController.php';
-require_once __DIR__ . '/../src/models/ImmunizationModels.php';
+
 require_once __DIR__ . '/../src/Controller/MembershipController.php';
 require_once __DIR__ . '/../src/models/MembershipModels.php';
+require_once __DIR__ . '/../src/Controller/ImmunizationController.php';
+require_once __DIR__ . '/../src/models/ImmunizationModels.php';
+
+
 // 5. Get Request Info
 $requestMethod = $_SERVER["REQUEST_METHOD"];
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// 6. Initialize the Router & DB Connection
+// 6. Initialize Router & Database
 $router = new Router();
 $dbConnection = (new Database())->getConnection();
 
@@ -65,7 +67,7 @@ if ($dbConnection === null) {
     exit();
 }
 
-// --- 7. Define Your API Routes ---
+// --- 7. Define API Routes ---
 
 // Test Route
 $router->add('GET', '/api/test', function() {
@@ -87,7 +89,6 @@ $router->add('GET', '/api/pets', [$petController, 'getUserPets']);
 $router->add('POST', '/api/pets', [$petController, 'addPet']);
 $router->add('POST', '/api/pets/:id', [$petController, 'updatePet']);
 $router->add('DELETE', '/api/pets/:id', [$petController, 'deletePet']);
-// Admin Pet Routes
 $router->add('GET', '/api/admin/pets', [$petController, 'getAllPets']);
 $router->add('POST', '/api/admin/pets', [$petController, 'addAdoptionPet']);
 
@@ -99,15 +100,15 @@ $router->add('GET', '/api/bookings/user', [$bookingController, 'getUserBookings'
 $router->add('GET', '/api/bookings/doctor', [$bookingController, 'getDoctorBookings']);
 $router->add('GET', '/api/bookings/all', [$bookingController, 'getAllBookings']);
 $router->add('PUT', '/api/bookings/:id/status', [$bookingController, 'updateBookingStatus']);
+// --- NEW: Manual Check-In Route ---
+$router->add('PUT', '/api/bookings/:id/checkin', [$bookingController, 'checkIn']);
 
-// Store Routes (Public)
+// Store Routes
 $storeController = new StoreController($dbConnection);
 $router->add('GET', '/api/products', [$storeController, 'getAllProducts']);
 $router->add('GET', '/api/products/:id', [$storeController, 'getProductById']);
-
-// Store Routes (Admin Inventory) - NEW
 $router->add('POST', '/api/admin/products', [$storeController, 'createProduct']);
-$router->add('POST', '/api/admin/products/:id', [$storeController, 'updateProduct']); // POST used for file update
+$router->add('POST', '/api/admin/products/:id', [$storeController, 'updateProduct']);
 $router->add('DELETE', '/api/admin/products/:id', [$storeController, 'deleteProduct']);
 
 // Cart Routes
@@ -138,14 +139,16 @@ $router->add('POST', '/api/schedule', [$scheduleController, 'setSchedule']);
 $router->add('GET', '/api/schedule', [$scheduleController, 'getSchedule']);
 $router->add('GET', '/api/slots', [$scheduleController, 'getAvailableSlots']);
 
-// --- NEW: Immunization Routes ---
-$immunController = new ImmunizationController($dbConnection);
-// Get records for a pet
-$router->add('GET', '/api/pets/:id/immunizations', [$immunController, 'getRecords']);
-// Add a new record
-$router->add('POST', '/api/immunizations', [$immunController, 'addRecord']);
+// Membership Routes
 $membershipController = new MembershipController($dbConnection);
 $router->add('GET', '/api/membership', [$membershipController, 'getStatus']);
 $router->add('POST', '/api/membership', [$membershipController, 'subscribe']);
-// 8. Dispatch the Router
+
+// Immunization Routes
+$immunController = new ImmunizationController($dbConnection);
+$router->add('GET', '/api/pets/:id/immunizations', [$immunController, 'getRecords']);
+$router->add('POST', '/api/immunizations', [$immunController, 'addRecord']);
+
+
+// 8. Dispatch
 $router->dispatch($requestMethod, $requestUri);
