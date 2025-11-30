@@ -12,18 +12,42 @@ class StoreModels {
     }
 
     /**
-     * Finds all products in the store (Admin sees everything, even 0 stock).
+     * Finds products with pagination AND search support.
+     * @param int $limit
+     * @param int $offset
+     * @param string $search (Optional) Search term
+     * @return array List of products.
      */
-    public function findAll() {
-        $sql = "SELECT * FROM store ORDER BY item_id DESC";
+    public function findAll($limit = null, $offset = 0, $search = '') {
+        $sql = "SELECT * FROM store WHERE stock > 0";
+
+        // Add search condition if provided
+        if (!empty($search)) {
+            $sql .= " AND item_name LIKE :search";
+        }
+
+        $sql .= " ORDER BY item_id DESC";
+
+        if ($limit !== null) {
+            $sql .= " LIMIT :limit OFFSET :offset";
+        }
+
         $stmt = $this->db->prepare($sql);
+
+        if (!empty($search)) {
+            $searchTerm = "%" . $search . "%";
+            $stmt->bindParam(':search', $searchTerm);
+        }
+
+        if ($limit !== null) {
+            $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
+        }
+
         $stmt->execute();
         return $stmt->fetchAll();
     }
 
-    /**
-     * Finds a single product by its ID.
-     */
     public function findById($itemId) {
         $sql = "SELECT * FROM store WHERE item_id = :itemId";
         $stmt = $this->db->prepare($sql);
@@ -32,9 +56,6 @@ class StoreModels {
         return $stmt->fetch();
     }
 
-    /**
-     * (Admin) Creates a new product.
-     */
     public function create($data) {
         try {
             $sql = "INSERT INTO store (item_name, description, price, stock, photo_url) 
@@ -47,7 +68,6 @@ class StoreModels {
             $stmt->bindParam(':price', $data['price']);
             $stmt->bindParam(':stock', $data['stock']);
 
-            // Handle null photo
             $photoUrl = isset($data['photo_url']) ? $data['photo_url'] : null;
             $stmt->bindParam(':photoUrl', $photoUrl);
 
@@ -59,12 +79,8 @@ class StoreModels {
         }
     }
 
-    /**
-     * (Admin) Updates a product.
-     */
     public function update($itemId, $data) {
         try {
-            // We build the query dynamically because photo_url might not change
             $sql = "UPDATE store SET 
                         item_name = :name,
                         description = :desc,
@@ -97,10 +113,6 @@ class StoreModels {
         }
     }
 
-    /**
-     * (Admin) Deletes a product.
-     * Note: This might fail if the item is in an existing order (Foreign Key constraint).
-     */
     public function delete($itemId) {
         try {
             $sql = "DELETE FROM store WHERE item_id = :itemId";

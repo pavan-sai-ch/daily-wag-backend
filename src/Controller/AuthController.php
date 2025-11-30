@@ -1,12 +1,15 @@
 <?php
 require_once __DIR__ . '/../Utils/Sanitize.php';
+require_once __DIR__ . '/../models/VisitModels.php'; // Import Visit Model
 
 class AuthController extends BaseController {
 
     private $userModel;
+    private $visitModel; // Add property
 
     public function __construct($db) {
         $this->userModel = new UserModels($db);
+        $this->visitModel = new VisitModels($db); // Initialize
     }
 
     /**
@@ -73,6 +76,19 @@ class AuthController extends BaseController {
             $_SESSION['user_role'] = $user['role'];
             $_SESSION['user_first_name'] = $user['first_name'];
 
+            // --- LOGGING START ---
+            // Log the successful login event
+            $ip = $_SERVER['REMOTE_ADDR'];
+            // Handle proxies if necessary
+            if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+                $ip = $_SERVER['HTTP_CLIENT_IP'];
+            } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+                $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+            }
+
+            $this->visitModel->log($user['user_id'], $ip, 'Login Action');
+            // --- LOGGING END ---
+
             $this->sendResponse([
                 'status' => 'success',
                 'user' => [
@@ -81,7 +97,7 @@ class AuthController extends BaseController {
                     'lastName' => $user['last_name'],
                     'email' => $user['email'],
                     'role' => $user['role'],
-                    'address' => $user['address'], // Send address so frontend can validate checkout
+                    'address' => $user['address'],
                     'phone' => $user['phone']
                 ]
             ], 200);
@@ -93,7 +109,6 @@ class AuthController extends BaseController {
 
     /**
      * Handles GET /api/auth/me
-     * Used by frontend to check if session is valid on page reload.
      */
     public function checkSession() {
         if (!isset($_SESSION['user_id'])) {
@@ -130,25 +145,20 @@ class AuthController extends BaseController {
 
     /**
      * Handles PUT /api/auth/profile
-     * Updates the logged-in user's profile (address, phone, name).
      */
     public function updateProfile() {
         try {
-            // 1. Authenticate
             $session = $this->authenticate();
             $userId = $session['user_id'];
 
-            // 2. Get Data
             $data = $this->getRequestData();
             $data = Sanitize::all($data);
 
-            // 3. Validation
             if (empty($data['first_name']) || empty($data['last_name'])) {
                 $this->sendError('First name and Last name are required.', 400);
                 return;
             }
 
-            // 4. Update Database
             $success = $this->userModel->updateProfile($userId, [
                 'first_name' => $data['first_name'],
                 'last_name' => $data['last_name'],
@@ -157,10 +167,7 @@ class AuthController extends BaseController {
             ]);
 
             if ($success) {
-                // Fetch fresh user data to return
                 $updatedUser = $this->userModel->findById($userId);
-
-                // Update session data if name changed
                 $_SESSION['user_first_name'] = $updatedUser['first_name'];
 
                 $this->sendResponse([
@@ -187,7 +194,6 @@ class AuthController extends BaseController {
 
     /**
      * (Admin) GET /api/users
-     * Fetches all users in the system.
      */
     public function getAllUsers() {
         try {
@@ -207,13 +213,11 @@ class AuthController extends BaseController {
 
     /**
      * Handles GET /api/doctors
-     * Public route to get a list of doctors for booking.
      */
     public function getDoctors() {
         try {
             $doctors = $this->userModel->findDoctors();
 
-            // Format the data for the frontend dropdown
             $formattedDoctors = array_map(function($doc) {
                 return [
                     'id' => $doc['user_id'],

@@ -49,8 +49,13 @@ require_once __DIR__ . '/../src/models/ScheduleModels.php';
 
 require_once __DIR__ . '/../src/Controller/MembershipController.php';
 require_once __DIR__ . '/../src/models/MembershipModels.php';
+
 require_once __DIR__ . '/../src/Controller/ImmunizationController.php';
 require_once __DIR__ . '/../src/models/ImmunizationModels.php';
+
+// --- NEW: Visit/Telemetry Logs ---
+require_once __DIR__ . '/../src/Controller/VisitController.php';
+require_once __DIR__ . '/../src/models/VisitModels.php';
 
 
 // 5. Get Request Info
@@ -83,6 +88,11 @@ $router->add('PUT', '/api/auth/profile', [$authController, 'updateProfile']);
 $router->add('GET', '/api/users', [$authController, 'getAllUsers']);
 $router->add('GET', '/api/doctors', [$authController, 'getDoctors']);
 
+// Visit Logging Route
+$visitController = new VisitController($dbConnection);
+$router->add('POST', '/api/log-visit', [$visitController, 'logVisit']);
+
+
 // Pet Routes
 $petController = new PetController($dbConnection);
 $router->add('GET', '/api/pets', [$petController, 'getUserPets']);
@@ -100,7 +110,6 @@ $router->add('GET', '/api/bookings/user', [$bookingController, 'getUserBookings'
 $router->add('GET', '/api/bookings/doctor', [$bookingController, 'getDoctorBookings']);
 $router->add('GET', '/api/bookings/all', [$bookingController, 'getAllBookings']);
 $router->add('PUT', '/api/bookings/:id/status', [$bookingController, 'updateBookingStatus']);
-// --- NEW: Manual Check-In Route ---
 $router->add('PUT', '/api/bookings/:id/checkin', [$bookingController, 'checkIn']);
 
 // Store Routes

@@ -1,8 +1,6 @@
 <?php
 require_once __DIR__ . '/../Utils/Sanitize.php';
 require_once __DIR__ . '/../models/BookingModels.php';
-// We need to fetch user details/schedule sometimes, so good to have access if needed
-// require_once __DIR__ . '/../models/UserModels.php';
 
 class BookingController extends BaseController {
 
@@ -12,7 +10,7 @@ class BookingController extends BaseController {
         $this->bookingModel = new BookingModels($db);
     }
 
-    // ... (Keep addGroomingBooking, addMedicalBooking as they are) ...
+    // --- BOOKING CREATION ---
 
     public function addGroomingBooking() {
         try {
@@ -27,6 +25,7 @@ class BookingController extends BaseController {
                 return;
             }
 
+            // Format date: Replace 'T' with space for MySQL DATETIME
             $formattedDate = str_replace('T', ' ', $data['booking_date']);
 
             $bookingData = [
@@ -59,12 +58,15 @@ class BookingController extends BaseController {
                 return;
             }
 
+            // Format date
+            $formattedDate = str_replace('T', ' ', $data['booking_date']);
+
             $bookingData = [
                 'user_id' => $userId,
                 'pet_id' => (int)$data['pet_id'],
                 'doctor_id' => (int)$data['doctor_id'],
                 'booking_type' => 'medical',
-                'booking_date' => $data['booking_date'],
+                'booking_date' => $formattedDate,
                 'service_type' => $data['service_type']
             ];
 
@@ -76,13 +78,16 @@ class BookingController extends BaseController {
         }
     }
 
+    // --- GET BOOKINGS (With Auto-Status Update) ---
+
     public function getUserBookings() {
         try {
             $session = $this->authenticate();
             $userId = $session['user_id'];
 
-            // Optional: Run auto-update logic here if you implemented it in Model
-            // $this->bookingModel->autoUpdateStatuses();
+            // --- CRITICAL: Run status updater first ---
+            // This ensures old appointments are marked No Show/Completed correctly
+            $this->bookingModel->autoUpdateStatuses();
 
             $bookings = $this->bookingModel->findByUserId($userId);
 
@@ -100,6 +105,9 @@ class BookingController extends BaseController {
                 $this->sendError('Forbidden', 403);
                 return;
             }
+
+            // Also run update for doctors
+            $this->bookingModel->autoUpdateStatuses();
 
             $doctorId = $session['user_id'];
             $bookings = $this->bookingModel->findByDoctorId($doctorId);
@@ -119,6 +127,9 @@ class BookingController extends BaseController {
                 return;
             }
 
+            // Also run update for admin
+            $this->bookingModel->autoUpdateStatuses();
+
             $bookings = $this->bookingModel->findAll();
             $this->sendResponse($bookings, 200);
 
@@ -127,11 +138,32 @@ class BookingController extends BaseController {
         }
     }
 
+    // --- STATUS UPDATES ---
+
     public function updateBookingStatus($bookingId) {
         try {
             $session = $this->authenticate();
-            if ($session['user_role'] !== 'admin') {
-                $this->sendError('Forbidden', 403);
+
+            // Get the booking first to check ownership
+            $booking = $this->bookingModel->findById($bookingId);
+            if (!$booking) {
+                $this->sendError('Booking not found.', 404);
+                return;
+            }
+
+            $canUpdate = false;
+
+            // Allow Admin
+            if ($session['user_role'] === 'admin') {
+                $canUpdate = true;
+            }
+            // Allow Doctor (only if assigned to this booking)
+            elseif ($session['user_role'] === 'doctor' && $booking['doctor_id'] == $session['user_id']) {
+                $canUpdate = true;
+            }
+
+            if (!$canUpdate) {
+                $this->sendError('Forbidden: You cannot update this booking.', 403);
                 return;
             }
 
@@ -159,9 +191,9 @@ class BookingController extends BaseController {
     }
 
     /**
-     * --- MANUAL CHECK-IN (UPDATED) ---
+     * --- MANUAL CHECK-IN ---
      * Handles PUT /api/bookings/:id/checkin
-     * Enforces the 1-hour window rule.
+     * Allows user to check in manually within 1 hour of appointment.
      */
     public function checkIn($bookingId) {
         try {
@@ -176,7 +208,7 @@ class BookingController extends BaseController {
                 return;
             }
 
-            // Verify ownership
+            // Verify ownership (Basic security)
             if ($booking['user_id'] != $userId) {
                 $this->sendError('Forbidden: This is not your booking.', 403);
                 return;
