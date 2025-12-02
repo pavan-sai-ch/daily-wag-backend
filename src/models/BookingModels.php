@@ -27,7 +27,7 @@ class BookingModels {
 
         $stmt = $this->db->prepare($sql);
 
-        // Use bindValue for safer handling
+        // Use bindValue instead of bindParam for safer handling
         $stmt->bindValue(':userId', $data['user_id']);
         $stmt->bindValue(':petId', $data['pet_id']);
 
@@ -170,6 +170,7 @@ class BookingModels {
      * Marks a booking as Checked In.
      */
     public function checkIn($bookingId) {
+        date_default_timezone_set('America/Chicago'); // Ensure consistency
         $now = date('Y-m-d H:i:s');
         $sql = "UPDATE bookings SET status = 'Checked In', checkin_time = :now WHERE booking_id = :id";
         $stmt = $this->db->prepare($sql);
@@ -183,23 +184,34 @@ class BookingModels {
      * Runs whenever bookings are fetched to keep data fresh.
      */
     public function autoUpdateStatuses() {
+        // Set timezone to Central (or your local timezone) to match user expectation
+        // Ideally, this should be set globally in index.php or php.ini
+        date_default_timezone_set('America/Chicago');
+
+        $now = date('Y-m-d H:i:s');
+
         // Rule 1: Auto 'No Show'
-        // IF Status is 'Confirmed' AND (Current Time > Booking Time + 1 Hour)
-        // THEN set Status = 'No Show'
+        // IF Status is 'Confirmed' AND Current Time > (Booking Time + 15 Minutes)
+        // Meaning: If they are more than 15 minutes late, mark No Show.
         $sqlNoShow = "UPDATE bookings 
                       SET status = 'No Show' 
                       WHERE status = 'Confirmed' 
-                      AND booking_date < DATE_SUB(NOW(), INTERVAL 1 HOUR)";
-        $this->db->query($sqlNoShow);
+                      AND :now > DATE_ADD(booking_date, INTERVAL 15 MINUTE)";
+
+        $stmt1 = $this->db->prepare($sqlNoShow);
+        $stmt1->bindParam(':now', $now);
+        $stmt1->execute();
 
         // Rule 2: Auto 'Completed'
-        // IF Status is 'Checked In' AND (Current Time > Booking Time + 1 Hour)
+        // IF Status is 'Checked In' AND Current Time > (Booking Time + 1 Hour)
         // THEN set Status = 'Completed'
-        // (Assuming a standard appointment lasts 1 hour)
         $sqlComplete = "UPDATE bookings 
                         SET status = 'Completed' 
                         WHERE status = 'Checked In' 
-                        AND booking_date < DATE_SUB(NOW(), INTERVAL 1 HOUR)";
-        $this->db->query($sqlComplete);
+                        AND :now > DATE_ADD(booking_date, INTERVAL 1 HOUR)";
+
+        $stmt2 = $this->db->prepare($sqlComplete);
+        $stmt2->bindParam(':now', $now);
+        $stmt2->execute();
     }
 }

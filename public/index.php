@@ -2,7 +2,7 @@
 // 1. Start the session
 require_once __DIR__ . '/../src/helpers/sessions/SessionManager.php';
 SessionManager::start();
-
+date_default_timezone_set('America/Chicago');
 // 2. Global Headers & CORS
 $allowed_origin = getenv('FRONTEND_URL') ?: 'http://localhost:5173';
 header("Access-Control-Allow-Origin: " . $allowed_origin);

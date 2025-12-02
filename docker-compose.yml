@@ -6,19 +6,30 @@ services:
       dockerfile: dockerfile
     container_name: dailywag_php
     ports:
+      # Standard HTTP (Read from .env, usually 8080)
       - "${PHP_PORT}:80"
+      # NEW: Secure HTTPS mapping
+      # Maps localhost:8443 -> Container:443
+      - "8443:443"
     volumes:
       - ${PWD}:/var/www/html/
+
+    # Environment Variables
     environment:
+      # Database Config
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+
+      # Frontend Config
       FRONTEND_URL: ${FRONTEND_URL}
-      # AWS Config
+
+      # AWS S3 Config
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
       AWS_BUCKET: ${AWS_BUCKET}
+
     depends_on:
       - db
 
@@ -49,9 +60,7 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      # --- THE FIX IS HERE ---
-      # This base64 string decodes to: $cfg['Scheme'] = 'http';
-      # It forces phpMyAdmin to allow cookies over HTTP.
+      # Force HTTP cookies for phpMyAdmin (since it runs on HTTP locally)
       PMA_USER_CONFIG_BASE64: JGNmZ1snU2NoZW1lJ10gPSAnaHR0cCc7
     ports:
       - "${PMA_PORT}:80"
@@ -60,3 +69,5 @@ services:
 
 volumes:
   db-data:
+
+
