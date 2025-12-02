@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  php:
+    build:
+      context: .
+      dockerfile: dockerfile
+    ports:
+      - "80:80"
+    environment:
+      # These variables will be populated by Elastic Beanstalk settings
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_HOST: ${MYSQL_HOST} # Points to RDS
+      FRONTEND_URL: ${FRONTEND_URL}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+      AWS_BUCKET: ${AWS_BUCKET}
